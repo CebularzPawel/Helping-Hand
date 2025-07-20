@@ -78,6 +78,8 @@ public class MercenaryAI
                 return false;
             }
 
+            if(target instanceof BaseMercenary) return false;
+
             if (target instanceof Player player) {
                 return !player.isSpectator() && !player.isCreative();
             }
@@ -345,6 +347,8 @@ public class MercenaryAI
             if (attackTimestamp == this.timestamp) {
                 return false;
             }
+
+            if(lastAttacker instanceof BaseMercenary) return false;
 
             if (!this.canAttack(lastAttacker, TargetingConditions.DEFAULT)) {
                 return false;
