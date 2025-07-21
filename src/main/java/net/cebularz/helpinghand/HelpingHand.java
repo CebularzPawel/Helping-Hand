@@ -1,6 +1,7 @@
 package net.cebularz.helpinghand;
 
 import net.cebularz.helpinghand.core.ModEntity;
+import net.cebularz.helpinghand.core.ModMenus;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
@@ -12,6 +13,8 @@ public class HelpingHand {
     public HelpingHand(IEventBus modEventBus, ModContainer modContainer) {
 
         ModEntity.REGISTER.register(modEventBus);
+        ModMenus.REGISTER.register(modEventBus);
+
         modContainer.registerConfig(ModConfig.Type.COMMON, HelpingHandConfig.SPEC);
     }
 }

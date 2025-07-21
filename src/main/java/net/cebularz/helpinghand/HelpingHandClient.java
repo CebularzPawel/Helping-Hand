@@ -2,8 +2,11 @@ package net.cebularz.helpinghand;
 
 import net.cebularz.helpinghand.client.model.TestEntityModel;
 import net.cebularz.helpinghand.client.renderer.entity.TestEntityRenderer;
+import net.cebularz.helpinghand.client.screens.MercenaryScreen;
 import net.cebularz.helpinghand.common.entity.mercenary.TestMercenaryEntity;
+import net.cebularz.helpinghand.common.menu.MercenaryMenu;
 import net.cebularz.helpinghand.core.ModEntity;
+import net.cebularz.helpinghand.core.ModMenus;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.geom.builders.CubeDeformation;
 import net.minecraft.client.model.geom.builders.LayerDefinition;
@@ -15,6 +18,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
+import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 import net.neoforged.neoforge.event.entity.EntityAttributeCreationEvent;
@@ -27,7 +31,15 @@ public class HelpingHandClient {
     }
 
     @SubscribeEvent
-    static void onClientSetup(FMLClientSetupEvent event) {
+    static void onClientSetup(FMLClientSetupEvent event)
+    {
+
+    }
+
+    @SubscribeEvent
+    public static void registerModScreens(RegisterMenuScreensEvent event)
+    {
+        event.register(ModMenus.MERCENARY_MENU.get(), MercenaryScreen::new);
     }
 
     @SubscribeEvent
