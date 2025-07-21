@@ -1,8 +1,12 @@
 package net.cebularz.helpinghand.common.menu;
 
+import net.cebularz.helpinghand.common.entity.mercenary.BaseMercenary;
+import net.cebularz.helpinghand.common.entity.mercenary.ai.MercenaryContract;
+import net.cebularz.helpinghand.common.entity.mercenary.ai.MercenaryHireSystem;
 import net.cebularz.helpinghand.core.ModMenus;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.world.Container;
+import net.minecraft.world.ContainerListener;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Inventory;
@@ -18,21 +22,74 @@ public class MercenaryMenu extends AbstractContainerMenu {
     private @NotNull final Entity associatedEntity;
     private final Container container;
     private @NotNull final Level level;
+    private final Player player;
 
     public MercenaryMenu(int containerId, Inventory inv, RegistryFriendlyByteBuf buf)
     {
         this(containerId, inv, new SimpleContainer(1) ,inv.player.level().getEntity(buf.readInt()));
     }
 
-    protected MercenaryMenu(int containerId, Inventory inv, Container container ,Entity associatedEntity) {
+    public MercenaryMenu(int containerId, Inventory inv, Container container, Entity associatedEntity) {
         super(ModMenus.MERCENARY_MENU.get(), containerId);
         this.associatedEntity = associatedEntity;
         this.level = inv.player.level();
         this.container = container;
+        this.player = inv.player;
         checkContainerSize(container, 1);
         container.startOpen(inv.player);
-
+        this.addSlot(new PaymentSlot(container,0,141,34));
         addPlayerInventorySlots(105,83,inv);
+    }
+
+    private class PaymentSlot extends Slot {
+        public PaymentSlot(Container container, int slot, int x, int y) {
+            super(container, slot, x, y);
+        }
+
+        @Override
+        public void setChanged() {
+            super.setChanged();
+            checkHireConditions();
+        }
+
+        @Override
+        public boolean mayPlace(ItemStack stack) {
+            if (!(associatedEntity instanceof BaseMercenary mercenary)) return false;
+            if (mercenary.isHired()) return false;
+
+            MercenaryHireSystem hireSystem = new MercenaryHireSystem(mercenary);
+            MercenaryHireSystem.HirePrice price = hireSystem.getPriceForType();
+            return price.canAffordWithStack(stack);
+        }
+    }
+
+    private void checkHireConditions() {
+        if(!(associatedEntity instanceof BaseMercenary mercenary)) return;
+        if (level.isClientSide || mercenary.isHired()) return;
+
+        ItemStack slotItem = container.getItem(0);
+        if (slotItem.isEmpty()) return;
+
+        MercenaryHireSystem hireSystem = new MercenaryHireSystem(mercenary);
+        MercenaryHireSystem.HirePrice price = hireSystem.getPriceForType();
+
+        if (price.canAffordWithStack(slotItem)) {
+            Integer requiredAmount = price.itemRequirements().get(slotItem.getItem());
+            if (requiredAmount != null && slotItem.getCount() >= requiredAmount) {
+                slotItem.shrink(requiredAmount);
+
+                MercenaryContract contract = new MercenaryContract(player, 6000);
+                mercenary.setContract(contract);
+            }
+        }
+    }
+
+    @Override
+    public void slotsChanged(Container container) {
+        super.slotsChanged(container);
+        if (container == this.container) {
+            checkHireConditions();
+        }
     }
 
     @Override
@@ -63,12 +120,13 @@ public class MercenaryMenu extends AbstractContainerMenu {
                 slot.setChanged();
             }
         }
+        checkHireConditions();
         return stack;
     }
 
     @Override
     public boolean stillValid(Player player) {
-        return this.container.stillValid(player);
+        return this.container.stillValid(player) && associatedEntity.isAlive();
     }
 
     protected void addPlayerInventorySlots(int x, int y, Inventory playerInventory)

@@ -1,6 +1,8 @@
 package net.cebularz.helpinghand.common.entity.mercenary.ai;
 
 import net.cebularz.helpinghand.common.entity.mercenary.BaseMercenary;
+import net.cebularz.helpinghand.common.menu.MercenaryMenu;
+import net.cebularz.helpinghand.core.ModMenus;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
@@ -24,6 +26,7 @@ public class MercenaryHireSystem
 
     public InteractionResult handlePlayerInteraction(Player player, ItemStack heldItem) {
         if (mercenary.isHired()) {
+
             return handleHiredMercenaryInteraction(player);
         } else {
             return handleHireAttempt(player, heldItem);
@@ -49,10 +52,8 @@ public class MercenaryHireSystem
     private InteractionResult handleHiredMercenaryInteraction(Player player) {
         MercenaryContract contract = mercenary.getCurrentContract();
         if (contract != null && contract.getHirer().equals(player.getUUID())) {
-            player.sendSystemMessage(Component.literal("Time remaining: " + contract.getRemainingTime() + " seconds"));
             return InteractionResult.SUCCESS;
         } else {
-            player.sendSystemMessage(Component.literal("This mercenary is hired by someone else!"));
             return InteractionResult.PASS;
         }
     }
