@@ -210,7 +210,7 @@ public class MercenaryScreen extends AbstractContainerScreen<MercenaryMenu> {
         super.renderLabels(guiGraphics, mouseX, mouseY);
 
         if (menu.getAssociatedEntity() instanceof BaseMercenary mercenary) {
-            String displayText = nameBoxWidget.getValue();
+            String displayText = nameBoxWidget.getValue() + " the " + mercenary.type;
 
             if (mercenary.isHired()) {
                 MercenaryContract contract = mercenary.getCurrentContract();
@@ -218,9 +218,10 @@ public class MercenaryScreen extends AbstractContainerScreen<MercenaryMenu> {
                     int remainingSeconds = contract.getRemainingTime();
                     displayText += " (" + formatTime(remainingSeconds) + ")";
                 }
+
             }
 
-            guiGraphics.drawString(this.font, displayText, 95, 37, 0x404040, false);
+            guiGraphics.drawString(this.font, displayText, 110, 6, 0x404040, false);
         }
     }
 
