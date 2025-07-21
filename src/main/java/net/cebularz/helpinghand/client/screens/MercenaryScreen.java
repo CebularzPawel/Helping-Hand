@@ -1,11 +1,14 @@
 package net.cebularz.helpinghand.client.screens;
 
 import com.mojang.blaze3d.systems.RenderSystem;
+import net.cebularz.helpinghand.HelpingHandConfig;
 import net.cebularz.helpinghand.api.screens.NameBoxWidget;
 import net.cebularz.helpinghand.common.CommonClass;
+import net.cebularz.helpinghand.common.data.ReputationData;
 import net.cebularz.helpinghand.common.entity.mercenary.BaseMercenary;
 import net.cebularz.helpinghand.common.entity.mercenary.ai.MercenaryContract;
 import net.cebularz.helpinghand.common.menu.MercenaryMenu;
+import net.cebularz.helpinghand.core.ModAttachments;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
@@ -13,47 +16,81 @@ import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Inventory;
 
 public class MercenaryScreen extends AbstractContainerScreen<MercenaryMenu> {
 
     public static final ResourceLocation TEXTURE = CommonClass.path("textures/gui/mercenary/mercenary_gui.png");
     private final Minecraft minecraft;
-    private final NameBoxWidget nameBoxWidget;
-
-    public static final int FULL_WIDTH = 512;
-    public static final int FULL_HEIGHT = 256;
-
-    private int left;
-    private int right;
-    private int top;
-    private int bottom;
-
+    private NameBoxWidget nameBoxWidget;
+    private float lastHealth = 0f;
+    private float lastReputation = 0f;
     public MercenaryScreen(MercenaryMenu menu, Inventory playerInventory, Component title) {
         super(menu, playerInventory, title);
         minecraft = Minecraft.getInstance();
-        this.nameBoxWidget = new NameBoxWidget(this.minecraft.font,7,142,83,15,Component.empty(),TEXTURE,0,165,83,15,15);
     }
 
     @Override
     protected void init() {
-        super.init();
         this.imageWidth = 275;
         this.imageHeight = 165;
-        left = width / 2 - FULL_WIDTH / 2;
-        top = height / 2 - FULL_HEIGHT / 2;
-        right = width / 2 + FULL_WIDTH / 2;
-        bottom = height / 2 + FULL_HEIGHT / 2;
-        nameBoxWidget.setX(this.leftPos + 7);
-        nameBoxWidget.setY(this.topPos + 114);
+        super.init();
+        updateNameBoxPosition();
         this.addRenderableWidget(nameBoxWidget);
     }
+    @Override
+    public void resize(Minecraft minecraft, int width, int height) {
+        String currentText = nameBoxWidget != null ? nameBoxWidget.getValue() : "";
+        boolean wasFocused = nameBoxWidget != null && nameBoxWidget.isFocused();
 
+        super.resize(minecraft, width, height);
+
+        if (nameBoxWidget != null) {
+            nameBoxWidget.setValue(currentText);
+            if (wasFocused) {
+                nameBoxWidget.setFocused(true);
+            }
+        }
+    }
+
+    private void updateNameBoxPosition() {
+        int centerX = (width - imageWidth) / 2;
+        int centerY = (height - imageHeight) / 2;
+
+        if (nameBoxWidget == null) {
+            this.nameBoxWidget = new NameBoxWidget(
+                    this.font,
+                    centerX + 7, centerY + 142,
+                    83, 15,
+                    Component.empty(),
+                    TEXTURE,
+                    0, 165,
+                    512, 256
+            );
+            if (menu.getAssociatedEntity() != null && menu.getAssociatedEntity().hasCustomName()) {
+                String currentName = menu.getAssociatedEntity().getCustomName().getString();
+                nameBoxWidget.setValue(currentName);
+            }
+        } else {
+            nameBoxWidget.setPosition(centerX + 7, centerY + 142);
+        }
+    }
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (keyCode == 257 && this.nameBoxWidget.isFocused()) {
+        if (keyCode == 257 && this.nameBoxWidget.isFocused()) { // Enter key
             this.nameBoxWidget.setFocused(false);
+            if(menu.getAssociatedEntity() != null){
+                String name = this.nameBoxWidget.getValue();
+                if (!name.isEmpty()) {
+                    menu.getAssociatedEntity().setCustomName(Component.literal(name));
+                    menu.getAssociatedEntity().setCustomNameVisible(true);
+                } else {
+                    menu.getAssociatedEntity().setCustomName(null);
+                    menu.getAssociatedEntity().setCustomNameVisible(false);
+                }
+            }
             return true;
         }
 
@@ -63,7 +100,6 @@ public class MercenaryScreen extends AbstractContainerScreen<MercenaryMenu> {
 
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
-
     @Override
     public boolean charTyped(char codePoint, int modifiers) {
         if (this.nameBoxWidget.charTyped(codePoint, modifiers)) {
@@ -90,30 +126,83 @@ public class MercenaryScreen extends AbstractContainerScreen<MercenaryMenu> {
         int x = (width - imageWidth) / 2;
         int y = (height - imageHeight) / 2;
 
-        guiGraphics.blit(TEXTURE, x, y, 0, 0, imageWidth, imageHeight);
+        guiGraphics.blit(TEXTURE, x, y, 0, 0, imageWidth, imageHeight,512,256);
 
         if (!(menu.getAssociatedEntity() instanceof BaseMercenary mercenary)) return;
 
+        renderLerpedHealthBar(guiGraphics, x,y, partialTick);
+        renderLerpedReputationBar(guiGraphics, x,y, partialTick);
+
         InventoryScreen.renderEntityInInventoryFollowsMouse(
                 guiGraphics,
-                0,
-                0,
-                this.leftPos + 36,
-                this.topPos + 60,
-                30,
+                x+24,
+                y+9,
+                x + 73,
+                y + 74,
+                21,
                 0.35f,
-                (float)(this.leftPos + 36) - mouseX,
-                (float)(this.topPos + 60 - 50) - mouseY,
+                mouseX,
+                mouseY,
                 mercenary
         );
     }
 
-
     @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+        if (menu.getAssociatedEntity() instanceof BaseMercenary mercenary) {
+            lastHealth = mercenary.getHealth();
+            lastReputation = mercenary.getData(ModAttachments.REPUTATION).getCurrentReputation();
+        }
         this.renderBackground(guiGraphics,mouseX,mouseY,partialTick);
         super.render(guiGraphics, mouseX, mouseY, partialTick);
         this.renderTooltip(guiGraphics,mouseX,mouseY);
+    }
+
+    private void renderLerpedHealthBar(GuiGraphics guiGraphics, int x, int y, float partialTick) {
+        if (!(menu.getAssociatedEntity() instanceof BaseMercenary mercenary)) return;
+
+        float health = Mth.lerp(partialTick, lastHealth, mercenary.getHealth());
+        float max = mercenary.getMaxHealth();
+        float ratio = Mth.clamp(health / max, 0f, 1f);
+
+        int fullHeight = 61;
+        int filledHeight = Math.round(ratio * fullHeight);
+
+        guiGraphics.blit(
+                TEXTURE,
+                x + 11,
+                y + 11 + (fullHeight - filledHeight),
+                96,
+                170 + (fullHeight - filledHeight),
+                6,
+                filledHeight,
+                512,
+                256
+        );
+    }
+
+    private void renderLerpedReputationBar(GuiGraphics guiGraphics, int x, int y, float partialTick) {
+        if (!(menu.getAssociatedEntity() instanceof BaseMercenary mercenary)) return;
+        ReputationData data = mercenary.getData(ModAttachments.REPUTATION);
+
+        float rep = Mth.lerp(partialTick, lastReputation, data.getCurrentReputation());
+        float maxRep = HelpingHandConfig.MAX_MERCENARY_REPUTATION.get();
+        float ratio = Mth.clamp(rep / maxRep, 0f, 1f);
+
+        int fullHeight = 61;
+        int filledHeight = Math.round(ratio * fullHeight);
+
+        guiGraphics.blit(
+                TEXTURE,
+                x + 82,
+                y + 11 + (fullHeight - filledHeight),
+                114,
+                170 + (fullHeight - filledHeight),
+                5,
+                filledHeight,
+                512,
+                256
+        );
     }
 
     @Override

@@ -64,7 +64,7 @@ public class MercenaryMenu extends AbstractContainerMenu {
     }
 
     private void checkHireConditions() {
-        if(!(associatedEntity instanceof BaseMercenary mercenary)) return;
+        if (!(associatedEntity instanceof BaseMercenary mercenary)) return;
         if (level.isClientSide || mercenary.isHired()) return;
 
         ItemStack slotItem = container.getItem(0);
@@ -73,16 +73,13 @@ public class MercenaryMenu extends AbstractContainerMenu {
         MercenaryHireSystem hireSystem = new MercenaryHireSystem(mercenary);
         MercenaryHireSystem.HirePrice price = hireSystem.getPriceForType();
 
-        if (price.canAffordWithStack(slotItem)) {
-            Integer requiredAmount = price.itemRequirements().get(slotItem.getItem());
-            if (requiredAmount != null && slotItem.getCount() >= requiredAmount) {
-                slotItem.shrink(requiredAmount);
-
-                MercenaryContract contract = new MercenaryContract(player, 6000);
-                mercenary.setContract(contract);
-            }
+        if (slotItem.getItem() == price.item() && slotItem.getCount() >= price.amount()) {
+            slotItem.shrink(price.amount());
+            MercenaryContract contract = new MercenaryContract(player, 6000);
+            mercenary.setContract(contract);
         }
     }
+
 
     @Override
     public void slotsChanged(Container container) {

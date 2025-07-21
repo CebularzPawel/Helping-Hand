@@ -1,10 +1,13 @@
 package net.cebularz.helpinghand.common.entity.mercenary;
 
+import net.cebularz.helpinghand.HelpingHandConfig;
+import net.cebularz.helpinghand.common.data.ReputationData;
 import net.cebularz.helpinghand.common.entity.goals.ConditionalGoal;
 import net.cebularz.helpinghand.common.entity.mercenary.ai.MercenaryAI;
 import net.cebularz.helpinghand.common.entity.mercenary.ai.MercenaryContract;
 import net.cebularz.helpinghand.common.entity.mercenary.ai.MercenaryHireSystem;
 import net.cebularz.helpinghand.common.menu.MercenaryMenu;
+import net.cebularz.helpinghand.core.ModAttachments;
 import net.cebularz.helpinghand.core.ModMenus;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -55,6 +58,7 @@ public abstract class BaseMercenary extends PathfinderMob implements NeutralMob,
         super(entityType, level);
         this.type = MercenaryType.NONE;
         this.hireSystem = new MercenaryHireSystem(this);
+        setData(ModAttachments.REPUTATION.get(), new ReputationData((int)HelpingHandConfig.MAX_MERCENARY_REPUTATION.get()/4)); // I will explicitly cast to an int as players can do 25 and 25/4 isn't an int yk..
     }
 
     @Override
@@ -122,7 +126,7 @@ public abstract class BaseMercenary extends PathfinderMob implements NeutralMob,
                     return new MercenaryMenu(i, inventory, new SimpleContainer(1), BaseMercenary.this);
                 }
             }, buf -> buf.writeInt(this.getId()));
-            return hireSystem.handlePlayerInteraction(player, player.getItemInHand(hand));
+            return InteractionResult.SUCCESS;
         }
         return super.mobInteract(player, hand);
     }

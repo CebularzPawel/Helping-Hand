@@ -1,8 +1,10 @@
 package net.cebularz.helpinghand.api.screens;
 
+import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 
@@ -12,24 +14,28 @@ import net.minecraft.resources.ResourceLocation;
 public class NameBoxWidget extends EditBox {
 
     private final ResourceLocation texture;
-    private final int textureU;
-    private final int textureV;
-    private final int textureWidth;
-    private final int textureHeight;
-    private final int regionHeight;
+    private final int u, v;
+    private final int texWidth, texHeight;
 
     public NameBoxWidget(Font font, int x, int y, int width, int height,
-                         Component message, ResourceLocation texture,
-                         int textureU, int textureV,
-                         int textureWidth, int textureHeight,
-                         int regionHeight) {
+                         Component message,
+                         ResourceLocation texture,
+                         int u, int v,
+                         int texWidth, int texHeight) {
         super(font, x, y, width, height, message);
         this.texture = texture;
-        this.textureU = textureU;
-        this.textureV = textureV;
-        this.textureWidth = textureWidth;
-        this.textureHeight = textureHeight;
-        this.regionHeight = regionHeight;
+        this.u = u;
+        this.v = v;
+        this.texWidth = texWidth;
+        this.texHeight = texHeight;
+    }
+
+    /**
+     * Updates the position of this widget. Useful for handling screen resizes.
+     */
+    public void setPosition(int x, int y) {
+        this.setX(x);
+        this.setY(y);
     }
 
     @Override
@@ -39,14 +45,18 @@ public class NameBoxWidget extends EditBox {
     }
 
     private void renderTexturedBackground(GuiGraphics guiGraphics) {
-        int vOffset = this.isFocused() ? regionHeight : 0;
+        RenderSystem.setShader(GameRenderer::getPositionTexShader);
+        RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 1.0f);
+        RenderSystem.setShaderTexture(0, texture);
 
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
         guiGraphics.blit(
                 texture,
                 this.getX(), this.getY(),
-                textureU, textureV + vOffset,
+                u, v,
                 this.getWidth(), this.getHeight(),
-                textureWidth, textureHeight
+                texWidth, texHeight
         );
     }
 }
