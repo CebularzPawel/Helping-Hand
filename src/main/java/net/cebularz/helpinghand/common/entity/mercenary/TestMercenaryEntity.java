@@ -16,6 +16,11 @@ public class TestMercenaryEntity extends BaseMercenary{
         super(entityType, level);
     }
 
+    @Override
+    public void setRanged() {
+        this.setRanged(true);
+    }
+
     public static AttributeSupplier.Builder createAttribs(){
         return Mob.createMobAttributes()
                 .add(Attributes.MAX_HEALTH,20.0D)

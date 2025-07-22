@@ -70,13 +70,15 @@ public class MercenaryMenu extends AbstractContainerMenu {
         ItemStack slotItem = container.getItem(0);
         if (slotItem.isEmpty()) return;
 
-        MercenaryHireSystem hireSystem = new MercenaryHireSystem(mercenary);
+        MercenaryHireSystem hireSystem = mercenary.getHireSystem();
         MercenaryHireSystem.HirePrice price = hireSystem.getPriceForType();
 
-        if (slotItem.getItem() == price.item() && slotItem.getCount() >= price.amount()) {
+        if (price.canAffordWithStack(slotItem)) {
             slotItem.shrink(price.amount());
-            MercenaryContract contract = new MercenaryContract(player, 6000);
-            mercenary.setContract(contract);
+
+           mercenary.getHireSystem().hireMercenary(player);
+
+            container.setChanged();
         }
     }
 

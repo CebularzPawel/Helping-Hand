@@ -17,58 +17,10 @@ public class MercenaryHireSystem {
         this.mercenary = mercenary;
     }
 
-    public InteractionResult handlePlayerInteraction(Player player, ItemStack heldItem) {
-        if (mercenary.isHired()) {
-            return handleHiredMercenaryInteraction(player);
-        } else {
-            return handleHireAttempt(player, heldItem);
-        }
-    }
-
-    private InteractionResult handleHireAttempt(Player player, ItemStack heldItem) {
-        HirePrice price = getPriceForType();
-
-        if (!heldItem.isEmpty() && price.canAffordWithStack(heldItem)) {
-            if (price.consumeHeldPayment(player, heldItem)) {
-                hireMercenary(player);
-                return InteractionResult.SUCCESS;
-            }
-        }
-
-        if (price.canAffordAll(player)) {
-            if (price.consumeAllPayment(player)) {
-                hireMercenary(player);
-                return InteractionResult.SUCCESS;
-            }
-        }
-
-        showPriceInfo(player, price);
-        return InteractionResult.CONSUME;
-    }
-
-    private void hireMercenary(Player player) {
+    public void hireMercenary(Player player) {
         MercenaryContract contract = new MercenaryContract(player, 6000);
         mercenary.setContract(contract);
         player.sendSystemMessage(Component.literal("§aMercenary hired for 5 minutes!"));
-    }
-
-    private void showPriceInfo(Player player, HirePrice price) {
-        player.sendSystemMessage(Component.literal("§6Hire Price: §f" + price.getDescription()));
-        String affordableItems = price.getAffordableItems(player);
-        if (!affordableItems.isEmpty()) {
-            player.sendSystemMessage(Component.literal("§eYou have: §f" + affordableItems));
-        }
-    }
-
-    private InteractionResult handleHiredMercenaryInteraction(Player player) {
-        MercenaryContract contract = mercenary.getCurrentContract();
-        if (contract != null && contract.getHirer().equals(player.getUUID())) {
-            return InteractionResult.SUCCESS;
-        } else {
-            int remainingTime = contract != null ? contract.getRemainingTime() : 0;
-            player.sendSystemMessage(Component.literal("§cThis mercenary is hired by someone else for " + formatTime(remainingTime)));
-            return InteractionResult.CONSUME;
-        }
     }
 
     public HirePrice getPriceForType() {
@@ -76,12 +28,6 @@ public class MercenaryHireSystem {
             case ELF, HUMAN, UNDEAD, DWARFS, NONE -> new HirePrice(Items.DIAMOND, 5);
             default -> new HirePrice(Items.DIAMOND, 3);
         };
-    }
-
-    private String formatTime(int seconds) {
-        int minutes = seconds / 60;
-        int secs = seconds % 60;
-        return String.format("%d:%02d", minutes, secs);
     }
 
     public record HirePrice(Item item, int amount) {

@@ -1,14 +1,13 @@
 package net.cebularz.helpinghand.common.entity.mercenary;
 
 import net.cebularz.helpinghand.HelpingHandConfig;
-import net.cebularz.helpinghand.common.data.ReputationData;
+import net.cebularz.helpinghand.common.data.reputation.ReputationData;
 import net.cebularz.helpinghand.common.entity.goals.ConditionalGoal;
 import net.cebularz.helpinghand.common.entity.mercenary.ai.MercenaryAI;
 import net.cebularz.helpinghand.common.entity.mercenary.ai.MercenaryContract;
 import net.cebularz.helpinghand.common.entity.mercenary.ai.MercenaryHireSystem;
 import net.cebularz.helpinghand.common.menu.MercenaryMenu;
 import net.cebularz.helpinghand.core.ModAttachments;
-import net.cebularz.helpinghand.core.ModMenus;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.syncher.EntityDataAccessor;
@@ -30,16 +29,12 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.item.enchantment.EnchantmentHelper;
-import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.ServerLevelAccessor;
-import net.neoforged.neoforge.client.extensions.IMenuProviderExtension;
 import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nullable;
 import java.util.UUID;
-import java.util.stream.Stream;
 
 public abstract class BaseMercenary extends PathfinderMob implements NeutralMob, RangedAttackMob
 {
@@ -50,6 +45,9 @@ public abstract class BaseMercenary extends PathfinderMob implements NeutralMob,
     public MercenaryType type;
     private MercenaryContract currentContract;
     private final MercenaryHireSystem hireSystem;
+    private boolean ranged;
+
+    private UUID ownerUUID;
 
     private static final UniformInt PERSISTENT_ANGER_TIME = TimeUtil.rangeOfSeconds(20, 60);
     @Nullable
@@ -58,7 +56,7 @@ public abstract class BaseMercenary extends PathfinderMob implements NeutralMob,
         super(entityType, level);
         this.type = MercenaryType.NONE;
         this.hireSystem = new MercenaryHireSystem(this);
-        setData(ModAttachments.REPUTATION.get(), new ReputationData((int)HelpingHandConfig.MAX_MERCENARY_REPUTATION.get()/4)); // I will explicitly cast to an int as players can do 25 and 25/4 isn't an int yk..
+        setData(ModAttachments.REPUTATION.get(), new ReputationData(ownerUUID,(int)HelpingHandConfig.MAX_MERCENARY_REPUTATION.get()/4));
     }
 
     @Override
@@ -91,6 +89,9 @@ public abstract class BaseMercenary extends PathfinderMob implements NeutralMob,
         compound.putInt("mercenaryType",getMercenaryType().ordinal());
         compound.putInt("remainingAngerTime",getRemainingPersistentAngerTime());
         compound.putBoolean("hired",isHired());
+        if (ownerUUID != null) {
+            compound.putUUID("OwnerUUID", ownerUUID);
+        }
     }
 
     @Override
@@ -99,6 +100,9 @@ public abstract class BaseMercenary extends PathfinderMob implements NeutralMob,
         setMercenaryType(MercenaryType.values()[compound.getInt("mercenaryType")]);
         setRemainingPersistentAngerTime(compound.getInt("remainingAngerTime"));
         this.entityData.set(DATA_HIRED,compound.getBoolean("hired"));
+        if (compound.hasUUID("OwnerUUID")) {
+            ownerUUID = compound.getUUID("OwnerUUID");
+        }
     }
 
     @Override
@@ -113,22 +117,30 @@ public abstract class BaseMercenary extends PathfinderMob implements NeutralMob,
     }
 
     @Override
-    public InteractionResult mobInteract(Player player, InteractionHand hand) {
-        if (!this.level().isClientSide && hand == InteractionHand.MAIN_HAND) {
-            player.openMenu(new MenuProvider() {
-                @Override
-                public Component getDisplayName() {
-                    return Component.empty();
-                }
+    protected InteractionResult mobInteract(Player player, InteractionHand hand) {
+        if (!this.level().isClientSide) {
+            if (player.isShiftKeyDown()) {
+                return super.mobInteract(player, hand);
+            }
 
-                @Override
-                public @NotNull AbstractContainerMenu createMenu(int i, Inventory inventory, Player player) {
-                    return new MercenaryMenu(i, inventory, new SimpleContainer(1), BaseMercenary.this);
-                }
-            }, buf -> buf.writeInt(this.getId()));
+            this.openMercenaryGui(player);
             return InteractionResult.SUCCESS;
         }
-        return super.mobInteract(player, hand);
+        return InteractionResult.CONSUME;
+    }
+
+    public void openMercenaryGui(Player player) {
+        player.openMenu(new MenuProvider() {
+            @Override
+            public Component getDisplayName() {
+                return Component.empty();
+            }
+
+            @Override
+            public @NotNull AbstractContainerMenu createMenu(int i, Inventory inventory, Player player) {
+                return new MercenaryMenu(i, inventory, new SimpleContainer(1), BaseMercenary.this);
+            }
+        }, buf -> buf.writeInt(this.getId()));
     }
 
     public int getRemainingPersistentAngerTime() {
@@ -178,9 +190,31 @@ public abstract class BaseMercenary extends PathfinderMob implements NeutralMob,
         this.entityData.set(DATA_HIRED, contract != null);
     }
 
+    public MercenaryHireSystem getHireSystem() {
+        return this.hireSystem;
+    }
+
+    public void setOwner(Player player) {
+        this.ownerUUID = player.getUUID();
+    }
+
+    public Player getOwner() {
+        if (ownerUUID != null && this.level() != null) {
+            return this.level().getPlayerByUUID(ownerUUID);
+        }
+        return null;
+    }
+
+    public boolean isOwnedBy(Player player) {
+        return ownerUUID != null && ownerUUID.equals(player.getUUID());
+    }
+
+    public UUID getOwnerUUID() {
+        return ownerUUID;
+    }
+
     @Override
     protected void populateDefaultEquipmentEnchantments(ServerLevelAccessor level, RandomSource random, DifficultyInstance difficulty) {
-        //TODO::FIX ENCHANTMENT AND TOOLS AND ARMOR LOGIC
         super.populateDefaultEquipmentEnchantments(level, random, difficulty);
         this.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.DIAMOND_AXE));
 
@@ -190,8 +224,6 @@ public abstract class BaseMercenary extends PathfinderMob implements NeutralMob,
 
             if (difficultyMultiplier > 0.25F && random.nextFloat() < 0.5F) {
 
-//                EnchantmentHelper.enchantItem(random, mainHand,
-//                        (int)(5 + difficultyMultiplier * 10), Stream.of(En.FIRE_ASPECT,Enchantments.SHARPNESS));
             }
 
             this.setDropChance(EquipmentSlot.MAINHAND, 0.1F);
@@ -207,6 +239,15 @@ public abstract class BaseMercenary extends PathfinderMob implements NeutralMob,
         this.populateDefaultEquipmentEnchantments(level, level.getRandom(), difficulty);
         return super.finalizeSpawn(level, difficulty, spawnType, spawnGroupData);
     }
+
+    public boolean isRanged()
+    {
+        return ranged;
+    }
+
+    public void setRanged(boolean value) {this.ranged = value;};
+
+    public abstract void setRanged();
 
     public enum MercenaryType {
         NONE,
