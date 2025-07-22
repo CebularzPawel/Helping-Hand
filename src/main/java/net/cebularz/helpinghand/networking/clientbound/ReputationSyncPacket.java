@@ -11,7 +11,7 @@ import java.util.Map;
 import java.util.UUID;
 
 public record ReputationSyncPacket(UUID playerID, int reputationLevel) implements CustomPacketPayload {
-    public static final Type<ReputationSyncPacket> TYPE = new Type<>(CommonClass.path("serverboundSyncReputationPacket"));
+    public static final Type<ReputationSyncPacket> TYPE = new Type<>(CommonClass.path("sync_reputation_packet"));
     public static final StreamCodec<RegistryFriendlyByteBuf, ReputationSyncPacket> STREAM_CODEC = new StreamCodec<RegistryFriendlyByteBuf, ReputationSyncPacket>() {
         @Override
         public ReputationSyncPacket decode(RegistryFriendlyByteBuf buf) {

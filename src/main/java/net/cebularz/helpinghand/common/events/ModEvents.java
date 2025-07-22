@@ -24,26 +24,11 @@ public class ModEvents {
 
     @SubscribeEvent
     public static void onEntityKill(LivingDeathEvent event) {
-        LivingEntity victim = event.getEntity();
-        if (!event.getSource().is(DamageTypes.MOB_ATTACK)) return;
 
-        Entity source = event.getSource().getEntity();
-        if (source instanceof BaseMercenary mercenary && mercenary.isHired()) {
-            Player owner = mercenary.getOwner();
-            if (owner != null && victim.level() instanceof ServerLevel serverLevel) {
-                int toInc = (int) Mth.clamp(0.45F, victim.getHealth(), victim.getMaxHealth());
-
-                ReputationManager reputationManager = getReputationManager(mercenary);
-                if (reputationManager != null) {
-                    reputationManager.increaseReputation(owner.getUUID(), toInc);
-                    WorldReputationManager.get(serverLevel).markDirty();
-                }
-            }
-        }
     }
 
     @SubscribeEvent
-    public static void onLivingDamage(LivingDamageEvent event) {
+    public static void onLivingDamage(LivingDamageEvent.Post event) {
         LivingEntity victim = event.getEntity();
         if (victim instanceof BaseMercenary mercenary) {
             Entity attacker = event.getEntity().getLastAttacker();

@@ -23,6 +23,8 @@ import net.minecraft.world.entity.ai.goal.LookAtPlayerGoal;
 import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
 import net.minecraft.world.entity.ai.goal.WaterAvoidingRandomStrollGoal;
 import net.minecraft.world.entity.ai.goal.target.HurtByTargetGoal;
+import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
+import net.minecraft.world.entity.ai.goal.target.ResetUniversalAngerTargetGoal;
 import net.minecraft.world.entity.monster.RangedAttackMob;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
@@ -72,7 +74,9 @@ public abstract class BaseMercenary extends PathfinderMob implements NeutralMob,
         this.goalSelector.addGoal(7, new RandomLookAroundGoal(this));
 
         this.targetSelector.addGoal(0, new MercenaryAI.MercenaryDefendOwner(this));
-        this.targetSelector.addGoal(1, new HurtByTargetGoal(this).setAlertOthers(BaseMercenary.class));
+        this.targetSelector.addGoal(1, (new HurtByTargetGoal(this, new Class[0])).setAlertOthers(new Class[0]));
+        this.targetSelector.addGoal(2, new NearestAttackableTargetGoal<>(this, Player.class, 10, true, false, this::isAngryAt));
+        this.targetSelector.addGoal(3, new ResetUniversalAngerTargetGoal<>(this, true));
     }
 
     @Override
@@ -114,6 +118,11 @@ public abstract class BaseMercenary extends PathfinderMob implements NeutralMob,
                 setContract(null);
             }
         }
+    }
+
+    @Override
+    public boolean isAngryAt(LivingEntity p_21675_) {
+        return NeutralMob.super.isAngryAt(p_21675_);
     }
 
     @Override

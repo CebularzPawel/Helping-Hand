@@ -33,8 +33,8 @@ public class HelpingHand {
         ModAttachments.REGISTER.register(modEventBus);
 
         modEventBus.addListener(this::onGatherData);
+        modEventBus.register(PayloadHandler.class);
         NeoForge.EVENT_BUS.addListener(this::registerReloadListener);
-        NeoForge.EVENT_BUS.register(PayloadHandler.class);
     }
 
     public void registerReloadListener(AddReloadListenerEvent event) {
