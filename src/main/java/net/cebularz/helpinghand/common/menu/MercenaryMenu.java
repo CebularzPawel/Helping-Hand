@@ -3,6 +3,7 @@ package net.cebularz.helpinghand.common.menu;
 import net.cebularz.helpinghand.common.entity.mercenary.BaseMercenary;
 import net.cebularz.helpinghand.common.entity.mercenary.ai.MercenaryContract;
 import net.cebularz.helpinghand.common.entity.mercenary.ai.MercenaryHireSystem;
+import net.cebularz.helpinghand.common.entity.util.ReputationManager;
 import net.cebularz.helpinghand.core.ModMenus;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.world.Container;
@@ -57,26 +58,23 @@ public class MercenaryMenu extends AbstractContainerMenu {
             if (!(associatedEntity instanceof BaseMercenary mercenary)) return false;
             if (mercenary.isHired()) return false;
 
-            MercenaryHireSystem hireSystem = new MercenaryHireSystem(mercenary);
-            MercenaryHireSystem.HirePrice price = hireSystem.getPriceForType();
-            return price.canAffordWithStack(stack);
+            ItemStack price = mercenary.getHiringItem();
+            return stack == price;
         }
     }
 
     private void checkHireConditions() {
         if (!(associatedEntity instanceof BaseMercenary mercenary)) return;
         if (level.isClientSide || mercenary.isHired()) return;
-
         ItemStack slotItem = container.getItem(0);
         if (slotItem.isEmpty()) return;
 
         MercenaryHireSystem hireSystem = mercenary.getHireSystem();
-        MercenaryHireSystem.HirePrice price = hireSystem.getPriceForType();
 
-        if (price.canAffordWithStack(slotItem)) {
-            slotItem.shrink(price.amount());
+        if (slotItem == mercenary.getHiringItem()) {
+            slotItem.shrink(1);
 
-           mercenary.getHireSystem().hireMercenary(player);
+           mercenary.getHireSystem().hireMercenary(player,slotItem);
 
             container.setChanged();
         }

@@ -3,7 +3,6 @@ package net.cebularz.helpinghand;
 import net.cebularz.helpinghand.api.loaders.NamesJsonLoader;
 import net.cebularz.helpinghand.core.*;
 import net.cebularz.helpinghand.datagen.ModNamesProvider;
-import net.cebularz.helpinghand.networking.PayloadHandler;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.data.DataGenerator;
 import net.minecraft.data.PackOutput;
@@ -15,6 +14,15 @@ import net.neoforged.neoforge.client.event.RegisterClientReloadListenersEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.data.event.GatherDataEvent;
 import net.neoforged.neoforge.event.AddReloadListenerEvent;
+import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
+import net.cebularz.helpinghand.common.entity.util.ReputationManager;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.Commands;
+import net.minecraft.commands.arguments.EntityArgument;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
+import net.neoforged.neoforge.event.RegisterCommandsEvent;
 
 import java.util.concurrent.CompletableFuture;
 
@@ -33,7 +41,6 @@ public class HelpingHand {
         ModAttachments.REGISTER.register(modEventBus);
 
         modEventBus.addListener(this::onGatherData);
-        modEventBus.register(PayloadHandler.class);
         NeoForge.EVENT_BUS.addListener(this::registerReloadListener);
     }
 

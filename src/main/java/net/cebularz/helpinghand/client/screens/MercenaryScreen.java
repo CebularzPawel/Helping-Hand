@@ -10,6 +10,7 @@ import net.cebularz.helpinghand.api.screens.NameBoxWidget;
 import net.cebularz.helpinghand.common.CommonClass;
 import net.cebularz.helpinghand.common.entity.mercenary.BaseMercenary;
 import net.cebularz.helpinghand.common.entity.mercenary.ai.MercenaryContract;
+import net.cebularz.helpinghand.common.entity.util.ReputationManager;
 import net.cebularz.helpinghand.common.menu.MercenaryMenu;
 import net.cebularz.helpinghand.core.ModAttachments;
 import net.cebularz.helpinghand.utils.GuiUtility;
@@ -26,6 +27,7 @@ import net.minecraft.world.entity.ai.targeting.TargetingConditions;
 import net.minecraft.world.entity.player.Inventory;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Random;
 import java.util.UUID;
 
@@ -255,7 +257,7 @@ public class MercenaryScreen extends AbstractContainerScreen<MercenaryMenu> {
 
     private void updateReputationState(BaseMercenary mercenary) {
         UUID targetUUID = getReputationTargetUUID(mercenary);
-        int newReputation = mercenary.getData(ModAttachments.REPUTATION.get()).getReputationWith(targetUUID);
+        int newReputation = ReputationManager.getReputation(mercenary.level(), Objects.requireNonNull(mercenary.level().getPlayerByUUID(targetUUID)));
 
         if (!targetUUID.equals(currentReputationUUID) || newReputation != currentReputation) {
             lastReputation = currentReputation;

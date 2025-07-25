@@ -1,7 +1,7 @@
 package net.cebularz.helpinghand.core;
 
 import net.cebularz.helpinghand.Constants;
-import net.cebularz.helpinghand.common.data.reputation.MercenaryReputation;
+import net.cebularz.helpinghand.common.entity.mercenary.ai.MercenaryReputation;
 import net.neoforged.neoforge.attachment.AttachmentType;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import net.neoforged.neoforge.registries.NeoForgeRegistries;
@@ -14,9 +14,6 @@ public class ModAttachments
             NeoForgeRegistries.ATTACHMENT_TYPES, Constants.MOD_ID
     );
 
-    public static final Supplier<AttachmentType<MercenaryReputation>> REPUTATION = REGISTER.register("reputation",
-            ()-> AttachmentType
-                    .builder(MercenaryReputation::new)
-                    .serialize(MercenaryReputation.CODEC)
-                    .build());
+    public static final Supplier<AttachmentType<MercenaryReputation>> MERCENARY_REPUTATION =
+            REGISTER.register("mercenary_reputation", () -> AttachmentType.serializable(MercenaryReputation::new).build());
 }
