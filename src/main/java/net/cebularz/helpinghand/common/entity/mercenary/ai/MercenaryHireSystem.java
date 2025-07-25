@@ -20,6 +20,7 @@ public class MercenaryHireSystem {
     public void hireMercenary(Player player) {
         MercenaryContract contract = new MercenaryContract(player, 6000);
         mercenary.setContract(contract);
+        mercenary.setOwner(player);
         player.sendSystemMessage(Component.literal("§aMercenary hired for 5 minutes!"));
     }
 

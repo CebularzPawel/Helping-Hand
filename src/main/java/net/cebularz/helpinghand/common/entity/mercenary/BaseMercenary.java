@@ -1,18 +1,19 @@
 package net.cebularz.helpinghand.common.entity.mercenary;
 
-import net.cebularz.helpinghand.HelpingHandConfig;
-import net.cebularz.helpinghand.common.data.reputation.ReputationData;
+import net.cebularz.helpinghand.common.data.reputation.MercenaryReputation;
 import net.cebularz.helpinghand.common.entity.goals.ConditionalGoal;
 import net.cebularz.helpinghand.common.entity.mercenary.ai.MercenaryAI;
 import net.cebularz.helpinghand.common.entity.mercenary.ai.MercenaryContract;
 import net.cebularz.helpinghand.common.entity.mercenary.ai.MercenaryHireSystem;
 import net.cebularz.helpinghand.common.menu.MercenaryMenu;
 import net.cebularz.helpinghand.core.ModAttachments;
+import net.cebularz.helpinghand.networking.PayloadHandler;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.RandomSource;
 import net.minecraft.util.TimeUtil;
 import net.minecraft.util.valueproviders.UniformInt;
@@ -58,7 +59,6 @@ public abstract class BaseMercenary extends PathfinderMob implements NeutralMob,
         super(entityType, level);
         this.type = MercenaryType.NONE;
         this.hireSystem = new MercenaryHireSystem(this);
-        setData(ModAttachments.REPUTATION.get(), new ReputationData(ownerUUID,(int)HelpingHandConfig.MAX_MERCENARY_REPUTATION.get()/4));
     }
 
     @Override
@@ -121,15 +121,16 @@ public abstract class BaseMercenary extends PathfinderMob implements NeutralMob,
     }
 
     @Override
-    public boolean isAngryAt(LivingEntity p_21675_) {
-        return NeutralMob.super.isAngryAt(p_21675_);
-    }
-
-    @Override
     protected InteractionResult mobInteract(Player player, InteractionHand hand) {
         if (!this.level().isClientSide) {
             if (player.isShiftKeyDown()) {
                 return super.mobInteract(player, hand);
+            }
+
+            int reputation = getReputationWith(player);
+            if (reputation < -50) {
+                player.sendSystemMessage(Component.literal("The mercenary glares at you menacingly and refuses to speak."));
+                return InteractionResult.SUCCESS;
             }
 
             this.openMercenaryGui(player);
@@ -252,6 +253,39 @@ public abstract class BaseMercenary extends PathfinderMob implements NeutralMob,
     public boolean isRanged()
     {
         return ranged;
+    }
+
+    public MercenaryReputation getReputationSystem() {
+        return this.getData(ModAttachments.REPUTATION.get());
+    }
+
+    public int getReputationWith(Player player) {
+        return getReputationSystem().getReputationWith(player.getUUID());
+    }
+
+    public boolean canBeHiredBy(Player player) {
+        return getReputationSystem().canBeHiredBy(player.getUUID());
+    }
+
+    public float getPriceMultiplierFor(Player player) {
+        return getReputationSystem().getPriceMultiplierFor(player.getUUID());
+    }
+
+    public void increaseReputationWith(Player player, int amount) {
+        getReputationSystem().increaseReputationWith(player.getUUID(), amount);
+        syncReputationToClient(player);
+    }
+
+    public void decreaseReputationWith(Player player, int amount) {
+        getReputationSystem().decreaseReputationWith(player.getUUID(), amount);
+        syncReputationToClient(player);
+    }
+
+    public void syncReputationToClient(Player player) {
+        if (player instanceof ServerPlayer serverPlayer) {
+            int reputation = getReputationWith(player);
+            PayloadHandler.syncReputation(serverPlayer, this.getUUID(), reputation);
+        }
     }
 
     public void setRanged(boolean value) {this.ranged = value;};

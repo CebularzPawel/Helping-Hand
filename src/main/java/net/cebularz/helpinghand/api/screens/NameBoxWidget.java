@@ -28,6 +28,8 @@ public class NameBoxWidget extends EditBox {
         this.v = v;
         this.texWidth = texWidth;
         this.texHeight = texHeight;
+
+        this.setBordered(false);
     }
 
     /**
@@ -41,16 +43,17 @@ public class NameBoxWidget extends EditBox {
     @Override
     public void renderWidget(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         renderTexturedBackground(guiGraphics);
+
         super.renderWidget(guiGraphics, mouseX, mouseY, partialTick);
     }
 
     private void renderTexturedBackground(GuiGraphics guiGraphics) {
         RenderSystem.setShader(GameRenderer::getPositionTexShader);
         RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 1.0f);
-        RenderSystem.setShaderTexture(0, texture);
 
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
+
         guiGraphics.blit(
                 texture,
                 this.getX(), this.getY(),
@@ -58,5 +61,7 @@ public class NameBoxWidget extends EditBox {
                 this.getWidth(), this.getHeight(),
                 texWidth, texHeight
         );
+
+        RenderSystem.disableBlend();
     }
 }

@@ -96,7 +96,7 @@ public class ConditionalGoal extends Goal {
      * Creates a conditional goal that only runs when the entity IS hired
      */
     public static ConditionalGoal whenHired(Goal goal, net.cebularz.helpinghand.common.entity.mercenary.BaseMercenary mercenary) {
-        return new ConditionalGoal(goal, () -> mercenary.isHired());
+        return new ConditionalGoal(goal, mercenary::isHired);
     }
 
     /**

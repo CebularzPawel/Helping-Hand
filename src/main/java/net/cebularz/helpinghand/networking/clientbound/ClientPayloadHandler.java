@@ -10,4 +10,10 @@ public class ClientPayloadHandler {
             ClientReputationManager.updateReputation(packet.playerID(),packet.reputationLevel());
         });
     }
+
+    public static void handleAllReputationSync(AllReputationSyncPacket packet, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            ClientReputationManager.updateAllReputations(packet.reputations());
+        });
+    }
 }

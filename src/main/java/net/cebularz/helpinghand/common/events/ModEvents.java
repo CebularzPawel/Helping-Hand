@@ -1,53 +1,60 @@
 package net.cebularz.helpinghand.common.events;
 
 import net.cebularz.helpinghand.Constants;
-import net.cebularz.helpinghand.client.data.ClientReputationManager;
-import net.cebularz.helpinghand.common.data.reputation.ReputationManager;
-import net.cebularz.helpinghand.common.data.reputation.WorldReputationManager;
+import net.cebularz.helpinghand.common.capabilities.mercenary.CapabilityInstances;
+import net.cebularz.helpinghand.common.data.reputation.MercenaryReputation;
 import net.cebularz.helpinghand.common.entity.mercenary.BaseMercenary;
-import net.minecraft.server.level.ServerLevel;
+import net.cebularz.helpinghand.core.ModAttachments;
+import net.cebularz.helpinghand.core.ModEntity;
+import net.cebularz.helpinghand.networking.PayloadHandler;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.util.Mth;
-import net.minecraft.world.damagesource.DamageTypes;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
-import net.neoforged.api.distmarker.Dist;
+import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
+import net.neoforged.neoforge.event.entity.EntityEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 
 @EventBusSubscriber(modid = Constants.MOD_ID)
-public class ModEvents {
-
+public class ModEvents
+{
     @SubscribeEvent
-    public static void onEntityKill(LivingDeathEvent event) {
-
+    public static void onRegisterCapabilities(RegisterCapabilitiesEvent event) {
+        event.registerEntity(
+                CapabilityInstances.MERCENARY_REPUTATION,
+                BaseMercenary.class,
+                (entity, context) -> entity.getCapability()
+        );
     }
 
     @SubscribeEvent
-    public static void onLivingDamage(LivingDamageEvent.Post event) {
-        LivingEntity victim = event.getEntity();
-        if (victim instanceof BaseMercenary mercenary) {
-            Entity attacker = event.getEntity().getLastAttacker();
+    public static void onEntityDamage(LivingDamageEvent.Post event)
+    {
+        if(event.getEntity() instanceof BaseMercenary mercenary)
+        {
+            if(mercenary.getLastAttacker() instanceof Player player)
+            {
+                int reputationLoss = mercenary.isHired() && player.getUUID().equals(mercenary.getOwnerUUID())
+                        ? MercenaryReputation.HURT_REPUTATION_LOSS * 2
+                        : MercenaryReputation.HURT_REPUTATION_LOSS;
 
-            if (attacker instanceof Player player && mercenary.isOwnedBy(player)
-                    && victim.level() instanceof ServerLevel serverLevel) {
+                mercenary.decreaseReputationWith(player, Math.abs(reputationLoss));
+            }
+        }
+    }
 
-                int toDec;
-                if (mercenary.isHired()) {
-                    toDec = (int) Mth.clamp(mercenary.getLastDamageSource().getFoodExhaustion(), 5, 14);
-                } else {
-                    toDec = (int) Mth.clamp(mercenary.getLastDamageSource().getFoodExhaustion(), 3, 11);
-                }
-
-                ReputationManager reputationManager = getReputationManager(mercenary);
-                if (reputationManager != null) {
-                    reputationManager.decreaseReputation(player.getUUID(), toDec);
-                    WorldReputationManager.get(serverLevel).markDirty();
-                }
+    @SubscribeEvent
+    public static void onEntityDeath(LivingDeathEvent event)
+    {
+        if(event.getEntity() instanceof BaseMercenary mercenary)
+        {
+            if(event.getSource().getEntity() instanceof Player player)
+            {
+                mercenary.decreaseReputationWith(player, Math.abs(MercenaryReputation.KILL_REPUTATION_LOSS));
+                spreadReputationToNearbyMercenaries(mercenary, player, MercenaryReputation.KILL_REPUTATION_LOSS / 2);
             }
         }
     }
@@ -55,26 +62,29 @@ public class ModEvents {
     @SubscribeEvent
     public static void onPlayerJoin(PlayerEvent.PlayerLoggedInEvent event) {
         if (event.getEntity() instanceof ServerPlayer serverPlayer) {
-            ServerLevel level = serverPlayer.serverLevel();
-            WorldReputationManager worldManager = WorldReputationManager.get(level);
-            worldManager.onPlayerJoin(serverPlayer);
+            PayloadHandler.syncAllMercenaryReputations(serverPlayer);
         }
     }
 
-    @EventBusSubscriber(modid = Constants.MOD_ID, value = Dist.CLIENT)
-    public static class ClientEvents {
-
-        @SubscribeEvent
-        public static void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
-            ClientReputationManager.clearCache();
+    @SubscribeEvent
+    public static void onPlayerChangeDimension(PlayerEvent.PlayerChangedDimensionEvent event) {
+        if (event.getEntity() instanceof ServerPlayer serverPlayer) {
+            PayloadHandler.syncAllMercenaryReputations(serverPlayer);
         }
     }
 
-    private static ReputationManager getReputationManager(LivingEntity entity) {
-        if (entity.level() instanceof ServerLevel serverLevel) {
-            WorldReputationManager worldManager = WorldReputationManager.get(serverLevel);
-            return worldManager.getReputationManager();
-        }
-        return null;
+    private static void spreadReputationToNearbyMercenaries(BaseMercenary sourceMercenary, Player player, int reputationChange) {
+        sourceMercenary.level().getEntitiesOfClass(BaseMercenary.class,
+                        sourceMercenary.getBoundingBox().inflate(32.0))
+                .stream()
+                .filter(merc -> merc != sourceMercenary)
+                .filter(merc -> merc.getMercenaryType() == sourceMercenary.getMercenaryType())
+                .forEach(merc -> {
+                    if (reputationChange > 0) {
+                        merc.increaseReputationWith(player, reputationChange);
+                    } else {
+                        merc.decreaseReputationWith(player, Math.abs(reputationChange));
+                    }
+                });
     }
 }
