@@ -1,13 +1,11 @@
 package net.cebularz.helpinghand.common.entity.mercenary;
 
-import net.cebularz.helpinghand.HelpingHandConfig;
-import net.cebularz.helpinghand.common.data.reputation.ReputationData;
 import net.cebularz.helpinghand.common.entity.goals.ConditionalGoal;
 import net.cebularz.helpinghand.common.entity.mercenary.ai.MercenaryAI;
 import net.cebularz.helpinghand.common.entity.mercenary.ai.MercenaryContract;
 import net.cebularz.helpinghand.common.entity.mercenary.ai.MercenaryHireSystem;
+import net.cebularz.helpinghand.common.entity.util.ReputationManager;
 import net.cebularz.helpinghand.common.menu.MercenaryMenu;
-import net.cebularz.helpinghand.core.ModAttachments;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.syncher.EntityDataAccessor;
@@ -17,6 +15,7 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.util.TimeUtil;
 import net.minecraft.util.valueproviders.UniformInt;
 import net.minecraft.world.*;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.*;
 import net.minecraft.world.entity.ai.goal.FloatGoal;
 import net.minecraft.world.entity.ai.goal.LookAtPlayerGoal;
@@ -58,7 +57,6 @@ public abstract class BaseMercenary extends PathfinderMob implements NeutralMob,
         super(entityType, level);
         this.type = MercenaryType.NONE;
         this.hireSystem = new MercenaryHireSystem(this);
-        setData(ModAttachments.REPUTATION.get(), new ReputationData(ownerUUID,(int)HelpingHandConfig.MAX_MERCENARY_REPUTATION.get()/4));
     }
 
     @Override
@@ -75,7 +73,8 @@ public abstract class BaseMercenary extends PathfinderMob implements NeutralMob,
 
         this.targetSelector.addGoal(0, new MercenaryAI.MercenaryDefendOwner(this));
         this.targetSelector.addGoal(1, (new HurtByTargetGoal(this, new Class[0])).setAlertOthers(new Class[0]));
-        this.targetSelector.addGoal(2, new NearestAttackableTargetGoal<>(this, Player.class, 10, true, false, this::isAngryAt));
+        this.targetSelector.addGoal(2, new NearestAttackableTargetGoal<>(this, Player.class, 10, true, false,
+                (player) -> this.isAngryAt(player) || ReputationManager.shouldBeHostile(this.level(), (Player)player)));
         this.targetSelector.addGoal(3, new ResetUniversalAngerTargetGoal<>(this, true));
     }
 
@@ -115,14 +114,13 @@ public abstract class BaseMercenary extends PathfinderMob implements NeutralMob,
         if (!this.level().isClientSide && currentContract != null) {
             currentContract.tick();
             if (currentContract.isExpired()) {
+                Player owner = getOwner();
+                if (owner != null) {
+                    ReputationManager.onContractCompleted(this.level(), owner);
+                }
                 setContract(null);
             }
         }
-    }
-
-    @Override
-    public boolean isAngryAt(LivingEntity p_21675_) {
-        return NeutralMob.super.isAngryAt(p_21675_);
     }
 
     @Override
@@ -131,11 +129,30 @@ public abstract class BaseMercenary extends PathfinderMob implements NeutralMob,
             if (player.isShiftKeyDown()) {
                 return super.mobInteract(player, hand);
             }
-
             this.openMercenaryGui(player);
             return InteractionResult.SUCCESS;
         }
         return InteractionResult.CONSUME;
+    }
+
+    @Override
+    public void die(DamageSource damageSource) {
+        if (damageSource.getEntity() instanceof Player player) {
+            if (!isOwnedBy(player)) {
+                ReputationManager.onMercenaryKilled(this.level(), player, this);
+            }
+        }
+        super.die(damageSource);
+    }
+
+    @Override
+    public boolean hurt(DamageSource damageSource, float p_21017_) {
+        if (damageSource.getEntity() instanceof Player player) {
+            if (!isOwnedBy(player)) {
+                ReputationManager.onMercenaryAttacked(this.level(), player, this);
+            }
+        }
+        return super.hurt(damageSource, p_21017_);
     }
 
     public void openMercenaryGui(Player player) {
@@ -257,6 +274,7 @@ public abstract class BaseMercenary extends PathfinderMob implements NeutralMob,
     public void setRanged(boolean value) {this.ranged = value;};
 
     public abstract void setRanged();
+    public abstract ItemStack getHiringItem();
 
     public enum MercenaryType {
         NONE,

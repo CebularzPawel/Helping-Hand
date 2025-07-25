@@ -308,7 +308,7 @@ public class MercenaryAI
 
         private void tryTeleportToOwner() {
             if (this.owner instanceof Player) {
-                this.mercenary.moveTo(owner.getX(), owner.getY(), owner.getZ(), owner.getYRot(), owner.getXRot());
+                this.mercenary.moveTo(owner.getX(), mercenary.getOnPos().getY(), owner.getZ(), owner.getYRot(), owner.getXRot());
             }
         }
     }
