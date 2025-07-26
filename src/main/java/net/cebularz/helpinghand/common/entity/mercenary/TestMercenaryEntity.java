@@ -1,5 +1,7 @@
 package net.cebularz.helpinghand.common.entity.mercenary;
 
+import net.cebularz.helpinghand.common.entity.mercenary.ai.MercenaryReputation;
+import net.cebularz.helpinghand.core.ModAttachments;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;

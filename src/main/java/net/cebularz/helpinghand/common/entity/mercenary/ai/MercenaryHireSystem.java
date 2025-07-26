@@ -13,39 +13,78 @@ import java.util.Map;
 
 public class MercenaryHireSystem {
     private final BaseMercenary mercenary;
-    public final Map<ItemStack, Integer> priceTimeMap = new HashMap<>();
+    public final Map<Item, Integer> priceTimeMap = new HashMap<>();
+
     public MercenaryHireSystem(BaseMercenary mercenary) {
         this.mercenary = mercenary;
         addTimeForItem();
     }
 
     public boolean canPlayerHire(Player player) {
-        return ReputationManager.canHire(mercenary.level(), player);
+        return true;
     }
 
     public void hireMercenary(Player player, ItemStack hiringItem) {
-        MercenaryContract contract = new MercenaryContract(player, getTimeForItems(hiringItem));
-        mercenary.setContract(contract);
-        mercenary.setOwner(player);
+        int timeToAdd = getTimeForItems(hiringItem);
+
+        MercenaryContract currentContract = mercenary.getCurrentContract();
+
+        if (currentContract != null && !currentContract.isExpired()) {
+            currentContract.extendContract(timeToAdd);
+
+            int totalRemainingSeconds = currentContract.getRemainingTime();
+            player.sendSystemMessage(Component.literal(
+                    "§aMercenary contract extended! Time remaining: " + formatTime(totalRemainingSeconds)
+            ));
+        } else {
+            MercenaryContract contract = new MercenaryContract(player, timeToAdd);
+            mercenary.setContract(contract);
+            mercenary.setOwner(player);
+
+            int durationSeconds = timeToAdd / 20;
+            player.sendSystemMessage(Component.literal(
+                    "§aMercenary hired for " + formatTime(durationSeconds) + "!"
+            ));
+        }
 
         ReputationManager.onMercenaryHired(mercenary.level(), player);
-
-        player.sendSystemMessage(Component.literal("§aMercenary hired for 5 minutes!"));
     }
 
-    public int getTimeForItems(ItemStack item)
-    {
-        return priceTimeMap.get(item);
+    public int getTimeForItems(ItemStack item) {
+        return priceTimeMap.getOrDefault(item.getItem(), 0);
     }
 
-    public void addTimeForItem()
-    {
-        addItemForItem(new ItemStack(Items.DIAMOND),200);
-        addItemForItem(new ItemStack(Items.NETHERITE_INGOT),500);
+    public void addTimeForItem() {
+        addItemForItem(Items.DIAMOND, 200);
+        addItemForItem(Items.NETHERITE_INGOT, 500);
+        addItemForItem(Items.EMERALD, 300);
+        addItemForItem(Items.GOLD_INGOT, 100);
     }
 
-    public void addItemForItem(ItemStack stack, int timeToAdd)
-    {
-        priceTimeMap.put(stack,timeToAdd);
+    public void addItemForItem(Item item, int timeToAdd) {
+        priceTimeMap.put(item, timeToAdd);
+    }
+
+    private String formatTime(int seconds) {
+        if (seconds < 60) {
+            return seconds + " seconds";
+        } else {
+            int minutes = seconds / 60;
+            int remainingSeconds = seconds % 60;
+            return minutes + ":" + String.format("%02d", remainingSeconds) + " minutes";
+        }
+    }
+
+    public boolean canExtendContract() {
+        MercenaryContract contract = mercenary.getCurrentContract();
+        return contract != null && !contract.isExpired();
+    }
+
+    public int getRemainingContractTime() {
+        MercenaryContract contract = mercenary.getCurrentContract();
+        if (contract != null && !contract.isExpired()) {
+            return contract.getRemainingTime();
+        }
+        return 0;
     }
 }

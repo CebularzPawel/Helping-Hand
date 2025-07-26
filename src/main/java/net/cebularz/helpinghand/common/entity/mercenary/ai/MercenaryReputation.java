@@ -14,7 +14,7 @@ public class MercenaryReputation implements INBTSerializable<CompoundTag> {
 
     // Constant Fields (not to be touched, or can be if ur a coder ig)
     public static final int MIN_REPUTATION = -100;
-    public static final int MAX_REPUTATION = 1000;
+    public static final int MAX_REPUTATION = 100;
     public static final int NEUTRAL_REPUTATION = 0;
 
     public static final int HIRE_REPUTATION_GAIN = 10;
@@ -22,12 +22,12 @@ public class MercenaryReputation implements INBTSerializable<CompoundTag> {
     public static final int ATTACK_REPUTATION_LOSS = -25;
     public static final int KILL_REPUTATION_LOSS = -50;
 
-    public static final int HOSTILE_THRESHOLD = -200;
-    public static final int UNFRIENDLY_THRESHOLD = -100;
+    public static final int HOSTILE_THRESHOLD = -50;
+    public static final int UNFRIENDLY_THRESHOLD = -75;
     public static final int NEUTRAL_THRESHOLD = 0;
-    public static final int FRIENDLY_THRESHOLD = 100;
-    public static final int HONORED_THRESHOLD = 300;
-    public static final int REVERED_THRESHOLD = 600;
+    public static final int FRIENDLY_THRESHOLD = 50;
+    public static final int HONORED_THRESHOLD = 75;
+    public static final int REVERED_THRESHOLD = 100;
 
     public int getReputation(UUID playerId) {
         return playerReputations.getOrDefault(playerId, NEUTRAL_REPUTATION);

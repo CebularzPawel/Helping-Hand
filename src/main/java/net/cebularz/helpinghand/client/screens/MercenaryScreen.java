@@ -1,6 +1,3 @@
-/**
- * Code Under MIT Licence
- * **/
 package net.cebularz.helpinghand.client.screens;
 
 import com.mojang.blaze3d.systems.RenderSystem;
@@ -25,6 +22,7 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.targeting.TargetingConditions;
 import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.player.Player;
 
 import java.util.List;
 import java.util.Objects;
@@ -98,9 +96,9 @@ public class MercenaryScreen extends AbstractContainerScreen<MercenaryMenu> {
             ) : new NameBoxWidget(
                     font, centerX + 7, centerY + 142,
                     83, 15, Component.empty(),
-                    TEXTURE, 0, 0, 512, 256
+                    TEXTURE, 7, 142, 512, 256
             );
-            if (menu.getAssociatedEntity() != null && menu.getAssociatedEntity().hasCustomName()) {
+            if (menu.getAssociatedEntity().hasCustomName()) {
                 nameBoxWidget.setValue(menu.getAssociatedEntity().getCustomName().getString());
             }
         } else {
@@ -152,9 +150,9 @@ public class MercenaryScreen extends AbstractContainerScreen<MercenaryMenu> {
         renderLerpedHealthBar(guiGraphics, x, y, partialTick);
         renderLerpedReputationBar(guiGraphics, x, y, partialTick);
 
-        guiGraphics.blit(ICONS, x + 16, y + 89, 0, 0, 16, 16, 16, 48);
-        guiGraphics.blit(ICONS, x + 16, y + 119, 0, 16, 16, 16, 16, 48);
-        guiGraphics.blit(ICONS, x + 16, y + 149, 0, 32, 16, 16, 16, 48);
+        guiGraphics.blit(ICONS, x + 16, y + 83, 0, 0, 16, 16, 16, 48);
+        guiGraphics.blit(ICONS, x + 16, y + 100, 0, 16, 16, 16, 16, 48);
+        guiGraphics.blit(ICONS, x + 16, y + 122, 0, 32, 16, 16, 16, 48);
 
         InventoryScreen.renderEntityInInventoryFollowsMouse(guiGraphics, x + 24, y + 9, x + 73, y + 74, 21, 0.35f, mouseX, mouseY, mercenary);
     }
@@ -184,7 +182,7 @@ public class MercenaryScreen extends AbstractContainerScreen<MercenaryMenu> {
 
             if (mercenary.isHired()) {
                 MercenaryContract contract = mercenary.getCurrentContract();
-                if (contract != null) {
+                if (contract != null && !contract.isExpired()) {
                     displayText += " (" + formatTime(contract.getRemainingTime()) + ")";
                 }
             }
@@ -199,13 +197,13 @@ public class MercenaryScreen extends AbstractContainerScreen<MercenaryMenu> {
         int x = (width - imageWidth) / 2;
         int y = (height - imageHeight) / 2;
 
-        if (!mercenary.isHired()) return;
-        MercenaryContract contract = mercenary.getCurrentContract();
-        if (contract == null) return;
+        if (!mercenary.hasActiveContract()) return;
 
-        if (mouseX >= x + 210 && mouseX <= x + 225 && mouseY >= y + 34 && mouseY <= y + 48) {
-            guiGraphics.blit(TEXTURE, x + 211, y + 34, 288, 32, imageWidth, imageHeight, 512, 256);
-            guiGraphics.renderTooltip(font, Component.literal(GuiUtility.formatTicksToTime(contract.getRemainingTicks())), mouseX, mouseY);
+        int remainingTicks = mercenary.getContractRemainingTicks();
+        if (remainingTicks <= 0) return;
+
+        if (mouseX >= x + 190 && mouseX <= x + 270 && mouseY >= y + 30 && mouseY <= y + 45) {
+            guiGraphics.renderTooltip(font, Component.literal(GuiUtility.formatTicksToTime(remainingTicks)), mouseX, mouseY);
         }
     }
 
@@ -227,37 +225,47 @@ public class MercenaryScreen extends AbstractContainerScreen<MercenaryMenu> {
         int x = (width - imageWidth) / 2;
         int y = (height - imageHeight) / 2;
 
-        if (mouseX >= x + 16 && mouseX <= x + 32 && mouseY >= y + 89 && mouseY <= y + 105)
+        if (mouseX >= x + 16 && mouseX <= x + 32 && mouseY >= y + 83 && mouseY <= y + 99)
             guiGraphics.renderTooltip(font, Component.literal(String.format("Attack Damage: %.1f", damageValue)), mouseX, mouseY);
-        else if (mouseX >= x + 16 && mouseX <= x + 32 && mouseY >= y + 119 && mouseY <= y + 135)
+        else if (mouseX >= x + 16 && mouseX <= x + 32 && mouseY >= y + 108 && mouseY <= y + 112)
             guiGraphics.renderTooltip(font, Component.literal(String.format(mercenary.isRanged() ? "Attack Range: %.1f" : "Melee Damage: %.1f", rangeValue)), mouseX, mouseY);
-        else if (mouseX >= x + 16 && mouseX <= x + 32 && mouseY >= y + 149 && mouseY <= y + 165)
+        else if (mouseX >= x + 16 && mouseX <= x + 32 && mouseY >= y + 118 && mouseY <= y + 144)
             guiGraphics.renderTooltip(font, Component.literal(String.format("Health: %.1f/%.1f", mercenary.getHealth(), mercenary.getMaxHealth())), mouseX, mouseY);
     }
 
     private void renderStatValues(GuiGraphics guiGraphics, BaseMercenary mercenary) {
-        int x = (width - imageWidth) / 2;
-        int y = (height - imageHeight) / 2;
-
         guiGraphics.drawString(font, String.format("%.1f", damageValue), 38, 93, 0x404040, false);
         guiGraphics.drawString(font, String.format("%.1f", rangeValue), 38, 113, 0x404040, false);
         guiGraphics.drawString(font, String.format("%.1f/%.1f", mercenary.getHealth(), mercenary.getMaxHealth()), 38, 133, 0x404040, false);
     }
 
     private void renderTimeRemaining(GuiGraphics guiGraphics, BaseMercenary mercenary) {
-        int x = (width - imageWidth) / 2;
-        int y = (height - imageHeight) / 2;
+        if (!mercenary.hasActiveContract()) {
+            return;
+        }
 
-        if (!mercenary.isHired()) return;
-        MercenaryContract contract = mercenary.getCurrentContract();
-        if (contract == null) return;
+        int remainingTicks = mercenary.getContractRemainingTicks();
+        if (remainingTicks <= 0) {
+            return;
+        }
 
-        guiGraphics.drawString(font, GuiUtility.formatTicksToTime(contract.getRemainingTicks()), x + 195, y + 34, 0x404040, false);
+        String timeText = GuiUtility.formatTicksToTime(remainingTicks);
+        guiGraphics.drawString(font, timeText, 195, 34, 0x404040, false);
     }
 
     private void updateReputationState(BaseMercenary mercenary) {
         UUID targetUUID = getReputationTargetUUID(mercenary);
-        int newReputation = ReputationManager.getReputation(mercenary.level(), Objects.requireNonNull(mercenary.level().getPlayerByUUID(targetUUID)));
+
+        Player targetPlayer = mercenary.level().getPlayerByUUID(targetUUID);
+
+        if (targetPlayer == null) {
+            targetPlayer = Minecraft.getInstance().player;
+        }
+
+        int newReputation = 0;
+        if (targetPlayer != null) {
+            newReputation = ReputationManager.getReputation(mercenary.level(), targetPlayer);
+        }
 
         if (!targetUUID.equals(currentReputationUUID) || newReputation != currentReputation) {
             lastReputation = currentReputation;
@@ -271,7 +279,14 @@ public class MercenaryScreen extends AbstractContainerScreen<MercenaryMenu> {
             return mercenary.getOwnerUUID();
         }
         var nearestPlayer = mercenary.level().getNearestPlayer(TargetingConditions.forNonCombat(), mercenary);
-        return nearestPlayer != null ? nearestPlayer.getUUID() : new UUID(0, 0);
+        if (nearestPlayer != null) {
+            return nearestPlayer.getUUID();
+        }
+        Player clientPlayer = Minecraft.getInstance().player;
+        if (clientPlayer != null) {
+            return clientPlayer.getUUID();
+        }
+        return new UUID(0, 0);
     }
 
     private String getRandomName() {

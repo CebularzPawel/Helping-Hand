@@ -42,6 +42,8 @@ public abstract class BaseMercenary extends PathfinderMob implements NeutralMob,
     public static final EntityDataAccessor<Integer> DATA_TYPE = SynchedEntityData.defineId(BaseMercenary.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> DATA_REMAINING_ANGER_TIME = SynchedEntityData.defineId(BaseMercenary.class, EntityDataSerializers.INT);
     public static final EntityDataAccessor<Boolean> DATA_HIRED = SynchedEntityData.defineId(BaseMercenary.class, EntityDataSerializers.BOOLEAN);
+    private static final EntityDataAccessor<Integer> DATA_CONTRACT_REMAINING_TIME = SynchedEntityData.defineId(BaseMercenary.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Boolean> DATA_HAS_CONTRACT = SynchedEntityData.defineId(BaseMercenary.class, EntityDataSerializers.BOOLEAN);
 
     public MercenaryType type;
     private MercenaryContract currentContract;
@@ -84,8 +86,9 @@ public abstract class BaseMercenary extends PathfinderMob implements NeutralMob,
         builder.define(DATA_TYPE, MercenaryType.NONE.ordinal());
         builder.define(DATA_REMAINING_ANGER_TIME, 0);
         builder.define(DATA_HIRED, false);
+        builder.define(DATA_CONTRACT_REMAINING_TIME, 0);
+        builder.define(DATA_HAS_CONTRACT, false);
     }
-
     @Override
     public void addAdditionalSaveData(CompoundTag compound) {
         super.addAdditionalSaveData(compound);
@@ -113,6 +116,8 @@ public abstract class BaseMercenary extends PathfinderMob implements NeutralMob,
         super.tick();
         if (!this.level().isClientSide && currentContract != null) {
             currentContract.tick();
+            this.entityData.set(DATA_CONTRACT_REMAINING_TIME, currentContract.getRemainingTicks());
+
             if (currentContract.isExpired()) {
                 Player owner = getOwner();
                 if (owner != null) {
@@ -122,6 +127,7 @@ public abstract class BaseMercenary extends PathfinderMob implements NeutralMob,
             }
         }
     }
+
 
     @Override
     protected InteractionResult mobInteract(Player player, InteractionHand hand) {
@@ -213,7 +219,15 @@ public abstract class BaseMercenary extends PathfinderMob implements NeutralMob,
 
     public void setContract(MercenaryContract contract) {
         this.currentContract = contract;
-        this.entityData.set(DATA_HIRED, contract != null);
+        boolean hired = contract != null;
+        this.entityData.set(DATA_HIRED, hired);
+        this.entityData.set(DATA_HAS_CONTRACT, hired);
+
+        if (contract != null) {
+            this.entityData.set(DATA_CONTRACT_REMAINING_TIME, contract.getRemainingTicks());
+        } else {
+            this.entityData.set(DATA_CONTRACT_REMAINING_TIME, 0);
+        }
     }
 
     public MercenaryHireSystem getHireSystem() {
@@ -266,6 +280,19 @@ public abstract class BaseMercenary extends PathfinderMob implements NeutralMob,
         return super.finalizeSpawn(level, difficulty, spawnType, spawnGroupData);
     }
 
+    public int getContractRemainingTicks() {
+        if (!this.level().isClientSide && currentContract != null) {
+            return currentContract.getRemainingTicks();
+        }
+        return this.entityData.get(DATA_CONTRACT_REMAINING_TIME);
+    }
+
+    public boolean hasActiveContract() {
+        if (!this.level().isClientSide) {
+            return currentContract != null && !currentContract.isExpired();
+        }
+        return this.entityData.get(DATA_HAS_CONTRACT) && this.entityData.get(DATA_CONTRACT_REMAINING_TIME) > 0;
+    }
     public boolean isRanged()
     {
         return ranged;

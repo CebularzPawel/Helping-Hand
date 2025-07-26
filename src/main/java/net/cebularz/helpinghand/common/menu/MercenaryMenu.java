@@ -24,6 +24,7 @@ public class MercenaryMenu extends AbstractContainerMenu {
     private final Container container;
     private @NotNull final Level level;
     private final Player player;
+    private boolean processingSlotChange = false;
 
     public MercenaryMenu(int containerId, Inventory inv, RegistryFriendlyByteBuf buf)
     {
@@ -56,36 +57,63 @@ public class MercenaryMenu extends AbstractContainerMenu {
         @Override
         public boolean mayPlace(ItemStack stack) {
             if (!(associatedEntity instanceof BaseMercenary mercenary)) return false;
-            if (mercenary.isHired()) return false;
+            if (stack.isEmpty()) return false;
 
-            ItemStack price = mercenary.getHiringItem();
-            return stack == price;
+            MercenaryHireSystem hireSystem = mercenary.getHireSystem();
+            return hireSystem.getTimeForItems(stack) > 0;
         }
     }
 
     private void checkHireConditions() {
         if (!(associatedEntity instanceof BaseMercenary mercenary)) return;
-        if (level.isClientSide || mercenary.isHired()) return;
+        if (level.isClientSide) return;
+        if (processingSlotChange) return;
+
         ItemStack slotItem = container.getItem(0);
         if (slotItem.isEmpty()) return;
 
         MercenaryHireSystem hireSystem = mercenary.getHireSystem();
 
-        if (slotItem == mercenary.getHiringItem()) {
-            slotItem.shrink(1);
+        if (hireSystem.getTimeForItems(slotItem) <= 0) return;
 
-           mercenary.getHireSystem().hireMercenary(player,slotItem);
+        boolean canProcess = false;
 
-            container.setChanged();
+        if (!mercenary.isHired()) {
+            canProcess = hireSystem.canPlayerHire(player);
+        } else {
+            MercenaryContract contract = mercenary.getCurrentContract();
+            canProcess = contract != null && !contract.isExpired() && contract.isOwner(player);
+        }
+
+        if (canProcess) {
+            processingSlotChange = true;
+            try {
+                ItemStack itemToProcess = slotItem.copy();
+                itemToProcess.setCount(1);
+
+                slotItem.shrink(1);
+                hireSystem.hireMercenary(player, itemToProcess);
+                container.setChanged();
+            } finally {
+                processingSlotChange = false;
+            }
         }
     }
-
 
     @Override
     public void slotsChanged(Container container) {
         super.slotsChanged(container);
-        if (container == this.container) {
-            checkHireConditions();
+    }
+
+    @Override
+    public void removed(Player player) {
+        super.removed(player);
+        if (!this.level.isClientSide) {
+            ItemStack remainingItem = this.container.getItem(0);
+            if (!remainingItem.isEmpty()) {
+                player.getInventory().placeItemBackInInventory(remainingItem);
+                this.container.setItem(0, ItemStack.EMPTY);
+            }
         }
     }
 
@@ -117,13 +145,13 @@ public class MercenaryMenu extends AbstractContainerMenu {
                 slot.setChanged();
             }
         }
-        checkHireConditions();
         return stack;
     }
 
     @Override
     public boolean stillValid(Player player) {
-        return this.container.stillValid(player) && associatedEntity.isAlive();
+        return this.container.stillValid(player) && associatedEntity.isAlive() &&
+                associatedEntity.distanceToSqr(player) < 64.0; // Add distance check
     }
 
     protected void addPlayerInventorySlots(int x, int y, Inventory playerInventory)
