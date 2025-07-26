@@ -25,7 +25,11 @@ public class MercenaryHireSystem {
     }
 
     public void hireMercenary(Player player, ItemStack hiringItem) {
-        int timeToAdd = getTimeForItems(hiringItem);
+        int timePerItem = getTimeForItems(hiringItem);
+        int itemCount = hiringItem.getCount();
+        int timeToAdd = timePerItem * itemCount;
+
+        if (timeToAdd <= 0) return;
 
         MercenaryContract currentContract = mercenary.getCurrentContract();
 
@@ -33,22 +37,17 @@ public class MercenaryHireSystem {
             currentContract.extendContract(timeToAdd);
 
             int totalRemainingSeconds = currentContract.getRemainingTime();
-            player.sendSystemMessage(Component.literal(
-                    "§aMercenary contract extended! Time remaining: " + formatTime(totalRemainingSeconds)
-            ));
         } else {
             MercenaryContract contract = new MercenaryContract(player, timeToAdd);
             mercenary.setContract(contract);
             mercenary.setOwner(player);
 
             int durationSeconds = timeToAdd / 20;
-            player.sendSystemMessage(Component.literal(
-                    "§aMercenary hired for " + formatTime(durationSeconds) + "!"
-            ));
         }
 
         ReputationManager.onMercenaryHired(mercenary.level(), player);
     }
+
 
     public int getTimeForItems(ItemStack item) {
         return priceTimeMap.getOrDefault(item.getItem(), 0);

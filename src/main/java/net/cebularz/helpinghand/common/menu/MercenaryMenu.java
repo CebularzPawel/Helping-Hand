@@ -74,7 +74,8 @@ public class MercenaryMenu extends AbstractContainerMenu {
 
         MercenaryHireSystem hireSystem = mercenary.getHireSystem();
 
-        if (hireSystem.getTimeForItems(slotItem) <= 0) return;
+        int timePerItem = hireSystem.getTimeForItems(slotItem);
+        if (timePerItem <= 0) return;
 
         boolean canProcess = false;
 
@@ -99,6 +100,7 @@ public class MercenaryMenu extends AbstractContainerMenu {
             }
         }
     }
+
 
     @Override
     public void slotsChanged(Container container) {
@@ -151,7 +153,7 @@ public class MercenaryMenu extends AbstractContainerMenu {
     @Override
     public boolean stillValid(Player player) {
         return this.container.stillValid(player) && associatedEntity.isAlive() &&
-                associatedEntity.distanceToSqr(player) < 64.0; // Add distance check
+                associatedEntity.distanceToSqr(player) < 64.0;
     }
 
     protected void addPlayerInventorySlots(int x, int y, Inventory playerInventory)

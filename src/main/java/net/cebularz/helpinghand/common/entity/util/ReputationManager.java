@@ -21,7 +21,6 @@ public class ReputationManager {
         MercenaryReputation reputation = level.getData(ModAttachments.MERCENARY_REPUTATION.get());
         reputation.addReputation(player.getUUID(), MercenaryReputation.HIRE_REPUTATION_GAIN);
 
-        notifyReputationChange(player, MercenaryReputation.HIRE_REPUTATION_GAIN, "hiring a mercenary");
     }
 
     public static void onContractCompleted(Level level, Player player) {
@@ -30,7 +29,6 @@ public class ReputationManager {
         MercenaryReputation reputation = level.getData(ModAttachments.MERCENARY_REPUTATION.get());
         reputation.addReputation(player.getUUID(), MercenaryReputation.SUCCESSFUL_CONTRACT_BONUS);
 
-        notifyReputationChange(player, MercenaryReputation.SUCCESSFUL_CONTRACT_BONUS, "completing a contract");
     }
 
     public static void onMercenaryAttacked(Level level, Player player, BaseMercenary mercenary) {
@@ -41,7 +39,6 @@ public class ReputationManager {
 
         alertNearbyMercenaries(level, mercenary, player);
 
-        notifyReputationChange(player, MercenaryReputation.ATTACK_REPUTATION_LOSS, "attacking a mercenary");
     }
 
     public static void onMercenaryKilled(Level level, Player player, BaseMercenary mercenary) {
@@ -52,7 +49,6 @@ public class ReputationManager {
 
         alertNearbyMercenaries(level, mercenary, player);
 
-        notifyReputationChange(player, MercenaryReputation.KILL_REPUTATION_LOSS, "killing a mercenary");
     }
 
     public static MercenaryReputation.ReputationLevel getReputationLevel(Level level, Player player) {
@@ -97,21 +93,6 @@ public class ReputationManager {
             mercenary.startPersistentAngerTimer();
             mercenary.setPersistentAngerTarget(attacker.getUUID());
         }
-    }
-
-    private static void notifyReputationChange(Player player, int change, String reason) {
-        MercenaryReputation.ReputationLevel level = getReputationLevel(player.level(), player);
-        int currentRep = getReputation(player.level(), player);
-
-        String changeColor = change > 0 ? "§a+" : "§c";
-        String levelColor = String.format("§%x", level.getColor());
-
-        Component message = Component.literal(
-                String.format("§7Reputation %s%d §7for %s. Current: §f%d §7(%s%s§7)",
-                        changeColor, change, reason, currentRep, levelColor, level.getDisplayName())
-        );
-
-        player.sendSystemMessage(message);
     }
 
     public static Component getReputationDisplay(Level level, Player player) {

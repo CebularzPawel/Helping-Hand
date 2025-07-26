@@ -1,5 +1,6 @@
 package net.cebularz.helpinghand.common.entity.mercenary.ai;
 
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.entity.player.Player;
 
 import java.util.UUID;
@@ -15,6 +16,13 @@ public class MercenaryContract {
         this.hiredTime = System.currentTimeMillis();
         this.totalDurationTicks = durationTicks;
         this.remainingTicks = durationTicks;
+    }
+
+    private MercenaryContract(UUID hirerUUID, long hiredTime, int totalDurationTicks, int remainingTicks) {
+        this.hirerUUID = hirerUUID;
+        this.hiredTime = hiredTime;
+        this.totalDurationTicks = totalDurationTicks;
+        this.remainingTicks = remainingTicks;
     }
 
     public void tick() {
@@ -62,6 +70,28 @@ public class MercenaryContract {
 
     public boolean isOwner(UUID uuid) {
         return hirerUUID.equals(uuid);
+    }
+
+    public CompoundTag serializeNBT() {
+        CompoundTag tag = new CompoundTag();
+        tag.putUUID("hirerUUID", hirerUUID);
+        tag.putLong("hiredTime", hiredTime);
+        tag.putInt("totalDurationTicks", totalDurationTicks);
+        tag.putInt("remainingTicks", remainingTicks);
+        return tag;
+    }
+
+    public static MercenaryContract fromNBT(CompoundTag tag) {
+        if (!tag.hasUUID("hirerUUID")) {
+            throw new IllegalArgumentException("Contract NBT missing hirerUUID");
+        }
+
+        return new MercenaryContract(
+                tag.getUUID("hirerUUID"),
+                tag.getLong("hiredTime"),
+                tag.getInt("totalDurationTicks"),
+                tag.getInt("remainingTicks")
+        );
     }
 
     @Override

@@ -7,6 +7,7 @@ import net.cebularz.helpinghand.api.screens.NameBoxWidget;
 import net.cebularz.helpinghand.common.CommonClass;
 import net.cebularz.helpinghand.common.entity.mercenary.BaseMercenary;
 import net.cebularz.helpinghand.common.entity.mercenary.ai.MercenaryContract;
+import net.cebularz.helpinghand.common.entity.mercenary.ai.MercenaryReputation;
 import net.cebularz.helpinghand.common.entity.util.ReputationManager;
 import net.cebularz.helpinghand.common.menu.MercenaryMenu;
 import net.cebularz.helpinghand.core.ModAttachments;
@@ -24,10 +25,7 @@ import net.minecraft.world.entity.ai.targeting.TargetingConditions;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 
-import java.util.List;
-import java.util.Objects;
-import java.util.Random;
-import java.util.UUID;
+import java.util.*;
 
 public class MercenaryScreen extends AbstractContainerScreen<MercenaryMenu> {
     public static final ResourceLocation TEXTURE = CommonClass.path("textures/gui/mercenary/mercenary_gui.png");
@@ -60,7 +58,11 @@ public class MercenaryScreen extends AbstractContainerScreen<MercenaryMenu> {
 
         if (menu.getAssociatedEntity() instanceof BaseMercenary mercenary) {
             updateReputationState(mercenary);
+            if (lastReputation == 0f && currentReputation != 0) {
+                lastReputation = currentReputation;
+            }
         }
+
     }
 
     @Override
@@ -113,7 +115,7 @@ public class MercenaryScreen extends AbstractContainerScreen<MercenaryMenu> {
             var entity = menu.getAssociatedEntity();
             if (entity != null) {
                 String name = nameBoxWidget.getValue();
-                entity.setCustomName(name.isEmpty() ? null : Component.literal(name));
+                entity.setCustomName(name.isEmpty() ? Component.literal(getRandomName()) : Component.literal(name));
                 entity.setCustomNameVisible(!name.isEmpty());
             }
             return true;
@@ -150,9 +152,9 @@ public class MercenaryScreen extends AbstractContainerScreen<MercenaryMenu> {
         renderLerpedHealthBar(guiGraphics, x, y, partialTick);
         renderLerpedReputationBar(guiGraphics, x, y, partialTick);
 
-        guiGraphics.blit(ICONS, x + 16, y + 83, 0, 0, 16, 16, 16, 48);
-        guiGraphics.blit(ICONS, x + 16, y + 100, 0, 16, 16, 16, 16, 48);
-        guiGraphics.blit(ICONS, x + 16, y + 122, 0, 32, 16, 16, 16, 48);
+        guiGraphics.blit(ICONS, x + 16, y + 80, 0, 0, 16, 16, 16, 48);
+        guiGraphics.blit(ICONS, x + 16, y + 96, 0, 16, 16, 16, 16, 48);
+        guiGraphics.blit(ICONS, x + 16, y + 112, 0, 32, 16, 16, 16, 48);
 
         InventoryScreen.renderEntityInInventoryFollowsMouse(guiGraphics, x + 24, y + 9, x + 73, y + 74, 21, 0.35f, mouseX, mouseY, mercenary);
     }
@@ -180,10 +182,12 @@ public class MercenaryScreen extends AbstractContainerScreen<MercenaryMenu> {
             String name = (nameBoxWidget != null && !nameBoxWidget.getValue().isEmpty()) ? nameBoxWidget.getValue() : getRandomName();
             String displayText = name + " the " + mercenary.type;
 
-            if (mercenary.isHired()) {
-                MercenaryContract contract = mercenary.getCurrentContract();
-                if (contract != null && !contract.isExpired()) {
-                    displayText += " (" + formatTime(contract.getRemainingTime()) + ")";
+            if (mercenary.isHired() && mercenary.hasActiveContract()) {
+                int remainingTicks = mercenary.getContractRemainingTicks();
+                if (remainingTicks > 0) {
+                    int remainingSeconds = remainingTicks / 20;
+                    displayText += " (" + formatTime(remainingSeconds) + ")";
+                    System.out.println("Adding time to display: " + formatTime(remainingSeconds));
                 }
             }
 
@@ -196,8 +200,6 @@ public class MercenaryScreen extends AbstractContainerScreen<MercenaryMenu> {
     private void renderRemainingTimeToolTip(GuiGraphics guiGraphics, int mouseX, int mouseY, BaseMercenary mercenary) {
         int x = (width - imageWidth) / 2;
         int y = (height - imageHeight) / 2;
-
-        if (!mercenary.hasActiveContract()) return;
 
         int remainingTicks = mercenary.getContractRemainingTicks();
         if (remainingTicks <= 0) return;
@@ -215,8 +217,21 @@ public class MercenaryScreen extends AbstractContainerScreen<MercenaryMenu> {
     }
 
     private void renderLerpedReputationBar(GuiGraphics guiGraphics, int x, int y, float partialTick) {
-        float ratio = Mth.clamp(Mth.lerp(partialTick, lastReputation, currentReputation) / HelpingHandConfig.MAX_MERCENARY_REPUTATION.get(), 0f, 1f);
+        if (!(menu.getAssociatedEntity() instanceof BaseMercenary mercenary)) return;
+
+        float lerpedReputation = Mth.lerp(partialTick, lastReputation, currentReputation);
+
+        float normalizedReputation = (lerpedReputation - MercenaryReputation.MIN_REPUTATION) /
+                (MercenaryReputation.MAX_REPUTATION - MercenaryReputation.MIN_REPUTATION);
+        float ratio = Mth.clamp(normalizedReputation, 0f, 1f);
         int filledHeight = Math.round(ratio * 61);
+
+        if (Math.abs(currentReputation) > 0 || Math.abs(lastReputation) > 0) {
+            System.out.println("Reputation Debug - Last: " + lastReputation + ", Current: " + currentReputation +
+                    ", Lerped: " + lerpedReputation + ", Normalized: " + normalizedReputation +
+                    ", Ratio: " + ratio + ", FilledHeight: " + filledHeight);
+        }
+
         guiGraphics.blit(TEXTURE, x + 82, y + 11 + (61 - filledHeight), 114, 170 + (61 - filledHeight), 5, filledHeight, 512, 256);
     }
 
@@ -225,11 +240,11 @@ public class MercenaryScreen extends AbstractContainerScreen<MercenaryMenu> {
         int x = (width - imageWidth) / 2;
         int y = (height - imageHeight) / 2;
 
-        if (mouseX >= x + 16 && mouseX <= x + 32 && mouseY >= y + 83 && mouseY <= y + 99)
+        if (mouseX >= x + 16 && mouseX <= x + 32 && mouseY >= y + 80 && mouseY <= y + 99)
             guiGraphics.renderTooltip(font, Component.literal(String.format("Attack Damage: %.1f", damageValue)), mouseX, mouseY);
-        else if (mouseX >= x + 16 && mouseX <= x + 32 && mouseY >= y + 108 && mouseY <= y + 112)
+        else if (mouseX >= x + 16 && mouseX <= x + 32 && mouseY >= y + 96 && mouseY <= y + 112)
             guiGraphics.renderTooltip(font, Component.literal(String.format(mercenary.isRanged() ? "Attack Range: %.1f" : "Melee Damage: %.1f", rangeValue)), mouseX, mouseY);
-        else if (mouseX >= x + 16 && mouseX <= x + 32 && mouseY >= y + 118 && mouseY <= y + 144)
+        else if (mouseX >= x + 16 && mouseX <= x + 32 && mouseY >= y + 112 && mouseY <= y + 144)
             guiGraphics.renderTooltip(font, Component.literal(String.format("Health: %.1f/%.1f", mercenary.getHealth(), mercenary.getMaxHealth())), mouseX, mouseY);
     }
 
@@ -240,16 +255,19 @@ public class MercenaryScreen extends AbstractContainerScreen<MercenaryMenu> {
     }
 
     private void renderTimeRemaining(GuiGraphics guiGraphics, BaseMercenary mercenary) {
+
         if (!mercenary.hasActiveContract()) {
             return;
         }
 
         int remainingTicks = mercenary.getContractRemainingTicks();
+
         if (remainingTicks <= 0) {
             return;
         }
 
         String timeText = GuiUtility.formatTicksToTime(remainingTicks);
+
         guiGraphics.drawString(font, timeText, 195, 34, 0x404040, false);
     }
 
@@ -290,8 +308,16 @@ public class MercenaryScreen extends AbstractContainerScreen<MercenaryMenu> {
     }
 
     private String getRandomName() {
-        List<NamesJsonLoader.NameData> allNames = NamesJsonLoader.INSTANCE.getAllNames();
-        return allNames.isEmpty() ? "Unknown" : allNames.get(new Random().nextInt(allNames.size())).value();
+        List<NamesJsonLoader.NameData> allNames = NamesJsonLoader.INSTANCE != null
+                ? NamesJsonLoader.INSTANCE.getAllNames()
+                : Collections.emptyList();
+
+        if (allNames == null || allNames.isEmpty()) {
+            return "Unknown";
+        }
+
+        NamesJsonLoader.NameData randomName = allNames.get(menu.getAssociatedEntity().getRandom().nextInt(allNames.size()));
+        return randomName != null && randomName.value() != null ? randomName.value() : "Unknown";
     }
 
     private String formatTime(int seconds) {

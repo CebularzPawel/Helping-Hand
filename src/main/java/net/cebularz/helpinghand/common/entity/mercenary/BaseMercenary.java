@@ -42,9 +42,7 @@ public abstract class BaseMercenary extends PathfinderMob implements NeutralMob,
     public static final EntityDataAccessor<Integer> DATA_TYPE = SynchedEntityData.defineId(BaseMercenary.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> DATA_REMAINING_ANGER_TIME = SynchedEntityData.defineId(BaseMercenary.class, EntityDataSerializers.INT);
     public static final EntityDataAccessor<Boolean> DATA_HIRED = SynchedEntityData.defineId(BaseMercenary.class, EntityDataSerializers.BOOLEAN);
-    private static final EntityDataAccessor<Integer> DATA_CONTRACT_REMAINING_TIME = SynchedEntityData.defineId(BaseMercenary.class, EntityDataSerializers.INT);
-    private static final EntityDataAccessor<Boolean> DATA_HAS_CONTRACT = SynchedEntityData.defineId(BaseMercenary.class, EntityDataSerializers.BOOLEAN);
-
+    public static final EntityDataAccessor<Integer> DATA_CONTRACT_REMAINING_TICKS = SynchedEntityData.defineId(BaseMercenary.class,EntityDataSerializers.INT);
     public MercenaryType type;
     private MercenaryContract currentContract;
     private final MercenaryHireSystem hireSystem;
@@ -86,8 +84,7 @@ public abstract class BaseMercenary extends PathfinderMob implements NeutralMob,
         builder.define(DATA_TYPE, MercenaryType.NONE.ordinal());
         builder.define(DATA_REMAINING_ANGER_TIME, 0);
         builder.define(DATA_HIRED, false);
-        builder.define(DATA_CONTRACT_REMAINING_TIME, 0);
-        builder.define(DATA_HAS_CONTRACT, false);
+        builder.define(DATA_CONTRACT_REMAINING_TICKS, 0);
     }
     @Override
     public void addAdditionalSaveData(CompoundTag compound) {
@@ -95,8 +92,12 @@ public abstract class BaseMercenary extends PathfinderMob implements NeutralMob,
         compound.putInt("mercenaryType",getMercenaryType().ordinal());
         compound.putInt("remainingAngerTime",getRemainingPersistentAngerTime());
         compound.putBoolean("hired",isHired());
+        compound.putInt("contractRemainingTicks", getContractRemainingTicks());
         if (ownerUUID != null) {
             compound.putUUID("OwnerUUID", ownerUUID);
+        }
+        if (currentContract != null) {
+            compound.put("contract", currentContract.serializeNBT());
         }
     }
 
@@ -106,8 +107,18 @@ public abstract class BaseMercenary extends PathfinderMob implements NeutralMob,
         setMercenaryType(MercenaryType.values()[compound.getInt("mercenaryType")]);
         setRemainingPersistentAngerTime(compound.getInt("remainingAngerTime"));
         this.entityData.set(DATA_HIRED,compound.getBoolean("hired"));
+        this.entityData.set(DATA_CONTRACT_REMAINING_TICKS, compound.getInt("contractRemainingTicks"));
         if (compound.hasUUID("OwnerUUID")) {
             ownerUUID = compound.getUUID("OwnerUUID");
+        }
+        if (compound.contains("contract")) {
+            try {
+                currentContract = MercenaryContract.fromNBT(compound.getCompound("contract"));
+                this.entityData.set(DATA_HIRED, true);
+            } catch (Exception e) {
+                currentContract = null;
+                this.entityData.set(DATA_HIRED, false);
+            }
         }
     }
 
@@ -116,8 +127,7 @@ public abstract class BaseMercenary extends PathfinderMob implements NeutralMob,
         super.tick();
         if (!this.level().isClientSide && currentContract != null) {
             currentContract.tick();
-            this.entityData.set(DATA_CONTRACT_REMAINING_TIME, currentContract.getRemainingTicks());
-
+            this.entityData.set(DATA_CONTRACT_REMAINING_TICKS, currentContract.getRemainingTicks());
             if (currentContract.isExpired()) {
                 Player owner = getOwner();
                 if (owner != null) {
@@ -126,8 +136,8 @@ public abstract class BaseMercenary extends PathfinderMob implements NeutralMob,
                 setContract(null);
             }
         }
-    }
 
+    }
 
     @Override
     protected InteractionResult mobInteract(Player player, InteractionHand hand) {
@@ -221,13 +231,7 @@ public abstract class BaseMercenary extends PathfinderMob implements NeutralMob,
         this.currentContract = contract;
         boolean hired = contract != null;
         this.entityData.set(DATA_HIRED, hired);
-        this.entityData.set(DATA_HAS_CONTRACT, hired);
-
-        if (contract != null) {
-            this.entityData.set(DATA_CONTRACT_REMAINING_TIME, contract.getRemainingTicks());
-        } else {
-            this.entityData.set(DATA_CONTRACT_REMAINING_TIME, 0);
-        }
+        this.entityData.set(DATA_CONTRACT_REMAINING_TICKS, contract != null ? contract.getRemainingTicks() : 0);
     }
 
     public MercenaryHireSystem getHireSystem() {
@@ -280,18 +284,33 @@ public abstract class BaseMercenary extends PathfinderMob implements NeutralMob,
         return super.finalizeSpawn(level, difficulty, spawnType, spawnGroupData);
     }
 
-    public int getContractRemainingTicks() {
-        if (!this.level().isClientSide && currentContract != null) {
-            return currentContract.getRemainingTicks();
+    private void validateContract() {
+        if (currentContract != null && currentContract.isExpired()) {
+            currentContract = null;
+            this.entityData.set(DATA_HIRED, false);
+            if (ownerUUID != null) {
+                Player owner = getOwner();
+                if (owner != null) {
+                    ReputationManager.onContractCompleted(this.level(), owner);
+                }
+            }
         }
-        return this.entityData.get(DATA_CONTRACT_REMAINING_TIME);
+    }
+
+    public int getContractRemainingTicks() {
+        if (this.level().isClientSide) {
+            return this.entityData.get(DATA_CONTRACT_REMAINING_TICKS);
+        } else {
+            return currentContract != null ? currentContract.getRemainingTicks() : 0;
+        }
     }
 
     public boolean hasActiveContract() {
-        if (!this.level().isClientSide) {
+        if (this.level().isClientSide) {
+            return isHired() && getContractRemainingTicks() > 0;
+        } else {
             return currentContract != null && !currentContract.isExpired();
         }
-        return this.entityData.get(DATA_HAS_CONTRACT) && this.entityData.get(DATA_CONTRACT_REMAINING_TIME) > 0;
     }
     public boolean isRanged()
     {
