@@ -134,6 +134,29 @@ public class MercenaryReputation implements INBTSerializable<CompoundTag> {
         }
     }
 
+    public static ReputationLevel getReputationLevelFromValue(int reputation) {
+        if (reputation >= REVERED_THRESHOLD) return ReputationLevel.REVERED;
+        if (reputation >= HONORED_THRESHOLD) return ReputationLevel.HONORED;
+        if (reputation >= FRIENDLY_THRESHOLD) return ReputationLevel.FRIENDLY;
+        if (reputation >= NEUTRAL_THRESHOLD) return ReputationLevel.NEUTRAL;
+        if (reputation >= UNFRIENDLY_THRESHOLD) return ReputationLevel.UNFRIENDLY;
+        if (reputation >= HOSTILE_THRESHOLD) return ReputationLevel.HOSTILE;
+        return ReputationLevel.UNFRIENDLY;
+    }
+
+    public static double getPriceMultiplierFromValue(int reputation) {
+        ReputationLevel level = getReputationLevelFromValue(reputation);
+        return 0;
+    }
+
+    public static boolean canHireFromValue(int reputation) {
+        return false;
+    }
+
+    public static boolean shouldAttackOnSightFromValue(int reputation) {
+        return reputation <= HOSTILE_THRESHOLD;
+    }
+
     public enum ReputationLevel {
         HOSTILE("Hostile", 2.0, false, 0xFF5555),
         UNFRIENDLY("Unfriendly", 1.5, false, 0xFFAA00),

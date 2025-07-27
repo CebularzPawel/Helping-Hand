@@ -11,6 +11,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.RandomSource;
 import net.minecraft.util.TimeUtil;
 import net.minecraft.util.valueproviders.UniformInt;
@@ -43,6 +44,8 @@ public abstract class BaseMercenary extends PathfinderMob implements NeutralMob,
     private static final EntityDataAccessor<Integer> DATA_REMAINING_ANGER_TIME = SynchedEntityData.defineId(BaseMercenary.class, EntityDataSerializers.INT);
     public static final EntityDataAccessor<Boolean> DATA_HIRED = SynchedEntityData.defineId(BaseMercenary.class, EntityDataSerializers.BOOLEAN);
     public static final EntityDataAccessor<Integer> DATA_CONTRACT_REMAINING_TICKS = SynchedEntityData.defineId(BaseMercenary.class,EntityDataSerializers.INT);
+    public static final EntityDataAccessor<Integer> DATA_PLAYER_REPUTATION = SynchedEntityData.defineId(BaseMercenary.class, EntityDataSerializers.INT);
+
     public MercenaryType type;
     private MercenaryContract currentContract;
     private final MercenaryHireSystem hireSystem;
@@ -85,6 +88,7 @@ public abstract class BaseMercenary extends PathfinderMob implements NeutralMob,
         builder.define(DATA_REMAINING_ANGER_TIME, 0);
         builder.define(DATA_HIRED, false);
         builder.define(DATA_CONTRACT_REMAINING_TICKS, 0);
+        builder.define(DATA_PLAYER_REPUTATION, 0);
     }
     @Override
     public void addAdditionalSaveData(CompoundTag compound) {
@@ -99,6 +103,7 @@ public abstract class BaseMercenary extends PathfinderMob implements NeutralMob,
         if (currentContract != null) {
             compound.put("contract", currentContract.serializeNBT());
         }
+        compound.putInt("player_reputation",getPlayerReputation());
     }
 
     @Override
@@ -120,6 +125,7 @@ public abstract class BaseMercenary extends PathfinderMob implements NeutralMob,
                 this.entityData.set(DATA_HIRED, false);
             }
         }
+        setPlayerReputation(compound.getInt("player_reputation"));
     }
 
     @Override
@@ -172,6 +178,10 @@ public abstract class BaseMercenary extends PathfinderMob implements NeutralMob,
     }
 
     public void openMercenaryGui(Player player) {
+        if (!this.level().isClientSide()) {
+            int reputation = ReputationManager.getReputation(this.level(), player);
+            setPlayerReputation(reputation);
+        }
         player.openMenu(new MenuProvider() {
             @Override
             public Component getDisplayName() {
@@ -217,6 +227,14 @@ public abstract class BaseMercenary extends PathfinderMob implements NeutralMob,
         }
         int ordinal = this.entityData.get(DATA_TYPE);
         return MercenaryType.values()[ordinal];
+    }
+
+    public int getPlayerReputation() {
+        return this.entityData.get(DATA_PLAYER_REPUTATION);
+    }
+
+    public void setPlayerReputation(int reputation) {
+        this.entityData.set(DATA_PLAYER_REPUTATION, reputation);
     }
 
     public boolean isHired() {

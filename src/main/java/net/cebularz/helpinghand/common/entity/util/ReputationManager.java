@@ -11,7 +11,6 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
 
 import java.util.List;
-import java.util.UUID;
 
 public class ReputationManager {
 
@@ -20,7 +19,7 @@ public class ReputationManager {
 
         MercenaryReputation reputation = level.getData(ModAttachments.MERCENARY_REPUTATION.get());
         reputation.addReputation(player.getUUID(), MercenaryReputation.HIRE_REPUTATION_GAIN);
-
+        updateNearbyMercenariesReputation(level, player);
     }
 
     public static void onContractCompleted(Level level, Player player) {
@@ -28,7 +27,7 @@ public class ReputationManager {
 
         MercenaryReputation reputation = level.getData(ModAttachments.MERCENARY_REPUTATION.get());
         reputation.addReputation(player.getUUID(), MercenaryReputation.SUCCESSFUL_CONTRACT_BONUS);
-
+        updateNearbyMercenariesReputation(level, player);
     }
 
     public static void onMercenaryAttacked(Level level, Player player, BaseMercenary mercenary) {
@@ -38,7 +37,7 @@ public class ReputationManager {
         reputation.addReputation(player.getUUID(), MercenaryReputation.ATTACK_REPUTATION_LOSS);
 
         alertNearbyMercenaries(level, mercenary, player);
-
+        updateNearbyMercenariesReputation(level, player);
     }
 
     public static void onMercenaryKilled(Level level, Player player, BaseMercenary mercenary) {
@@ -48,32 +47,93 @@ public class ReputationManager {
         reputation.addReputation(player.getUUID(), MercenaryReputation.KILL_REPUTATION_LOSS);
 
         alertNearbyMercenaries(level, mercenary, player);
+        updateNearbyMercenariesReputation(level, player);
+    }
 
+    public static int getReputation(Level level, Player player) {
+        return getReputation(level, player, null);
+    }
+
+    public static int getReputation(Level level, Player player, BaseMercenary contextMercenary) {
+        if (level.isClientSide() && contextMercenary != null) {
+            return contextMercenary.getPlayerReputation();
+        } else if (!level.isClientSide()) {
+            MercenaryReputation reputation = level.getData(ModAttachments.MERCENARY_REPUTATION.get());
+            return reputation.getReputation(player.getUUID());
+        } else {
+            return 0;
+        }
     }
 
     public static MercenaryReputation.ReputationLevel getReputationLevel(Level level, Player player) {
+        if (level.isClientSide()) {
+            int rep = 0;
+            return MercenaryReputation.getReputationLevelFromValue(rep);
+        }
+
         MercenaryReputation reputation = level.getData(ModAttachments.MERCENARY_REPUTATION.get());
         return reputation.getReputationLevel(player.getUUID());
     }
 
-    public static int getReputation(Level level, Player player) {
-        MercenaryReputation reputation = level.getData(ModAttachments.MERCENARY_REPUTATION.get());
-        return reputation.getReputation(player.getUUID());
+    public static MercenaryReputation.ReputationLevel getReputationLevel(Level level, Player player, BaseMercenary contextMercenary) {
+        int rep = getReputation(level, player, contextMercenary);
+        return MercenaryReputation.getReputationLevelFromValue(rep);
     }
 
     public static boolean canHire(Level level, Player player) {
-        MercenaryReputation reputation = level.getData(ModAttachments.MERCENARY_REPUTATION.get());
-        return reputation.canHire(player.getUUID());
+        return canHire(level, player, null);
+    }
+
+    public static boolean canHire(Level level, Player player, BaseMercenary contextMercenary) {
+        return true;
     }
 
     public static double getPriceMultiplier(Level level, Player player) {
-        MercenaryReputation reputation = level.getData(ModAttachments.MERCENARY_REPUTATION.get());
-        return reputation.getPriceMultiplier(player.getUUID());
+        return getPriceMultiplier(level, player, null);
+    }
+
+    public static double getPriceMultiplier(Level level, Player player, BaseMercenary contextMercenary) {
+        if (level.isClientSide() && contextMercenary != null) {
+            int rep = contextMercenary.getPlayerReputation();
+            return MercenaryReputation.getPriceMultiplierFromValue(rep);
+        } else if (!level.isClientSide()) {
+            MercenaryReputation reputation = level.getData(ModAttachments.MERCENARY_REPUTATION.get());
+            return reputation.getPriceMultiplier(player.getUUID());
+        }
+        return 1.0;
     }
 
     public static boolean shouldBeHostile(Level level, Player player) {
-        MercenaryReputation reputation = level.getData(ModAttachments.MERCENARY_REPUTATION.get());
-        return reputation.shouldAttackOnSight(player.getUUID());
+        return shouldBeHostile(level, player, null);
+    }
+
+    public static boolean shouldBeHostile(Level level, Player player, BaseMercenary contextMercenary) {
+        if (level.isClientSide() && contextMercenary != null) {
+            int rep = contextMercenary.getPlayerReputation();
+            return rep <= MercenaryReputation.HOSTILE_THRESHOLD;
+        } else if (!level.isClientSide()) {
+            MercenaryReputation reputation = level.getData(ModAttachments.MERCENARY_REPUTATION.get());
+            return reputation.shouldAttackOnSight(player.getUUID());
+        }
+        return false;
+    }
+
+    private static void updateNearbyMercenariesReputation(Level level, Player player) {
+        if (level.isClientSide() || !(level instanceof ServerLevel serverLevel)) return;
+
+        double updateRadius = 32.0;
+        AABB searchArea = player.getBoundingBox().inflate(updateRadius);
+
+        List<BaseMercenary> nearbyMercenaries = serverLevel.getEntitiesOfClass(
+                BaseMercenary.class,
+                searchArea,
+                BaseMercenary::isAlive
+        );
+
+        int newReputation = getReputation(level, player);
+        for (BaseMercenary mercenary : nearbyMercenaries) {
+            mercenary.setPlayerReputation(newReputation);
+        }
     }
 
     private static void alertNearbyMercenaries(Level level, BaseMercenary attackedMercenary, Player attacker) {
@@ -96,8 +156,12 @@ public class ReputationManager {
     }
 
     public static Component getReputationDisplay(Level level, Player player) {
-        MercenaryReputation.ReputationLevel repLevel = getReputationLevel(level, player);
-        int reputation = getReputation(level, player);
+        return getReputationDisplay(level, player, null);
+    }
+
+    public static Component getReputationDisplay(Level level, Player player, BaseMercenary contextMercenary) {
+        MercenaryReputation.ReputationLevel repLevel = getReputationLevel(level, player, contextMercenary);
+        int reputation = getReputation(level, player, contextMercenary);
 
         String levelColor = String.format("§%x", repLevel.getColor());
 
@@ -119,7 +183,6 @@ public class ReputationManager {
 
                 CompoundTag serialized = reputation.serializeNBT(level.registryAccess());
                 player.sendSystemMessage(Component.literal("§7Serialized data: " + serialized.toString()));
-
             } else {
                 player.sendSystemMessage(Component.literal("§cAttachment is null!"));
             }
@@ -145,5 +208,7 @@ public class ReputationManager {
 
         double multiplier = getPriceMultiplier(level, player);
         player.sendSystemMessage(Component.literal("§7Price multiplier: " + multiplier));
+
+        updateNearbyMercenariesReputation(level, player);
     }
 }

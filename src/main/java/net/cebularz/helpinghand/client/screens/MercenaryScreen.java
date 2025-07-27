@@ -36,10 +36,13 @@ public class MercenaryScreen extends AbstractContainerScreen<MercenaryMenu> {
 
     private float lastHealth = 0f;
     private float lastReputation = 0f;
+    private float targetReputation = 0f;
     private double damageValue;
     private double rangeValue;
     private UUID currentReputationUUID = null;
     private int currentReputation = 0;
+    private String cachedRandomName = null;
+    private boolean reputationInitialized = false;
 
     public MercenaryScreen(MercenaryMenu menu, Inventory playerInventory, Component title) {
         super(menu, playerInventory, title);
@@ -51,18 +54,19 @@ public class MercenaryScreen extends AbstractContainerScreen<MercenaryMenu> {
         this.imageWidth = 275;
         this.imageHeight = 165;
         super.init();
-
+        this.inventoryLabelY = 100000;
         updateNameBoxPosition();
         this.addRenderableWidget(nameBoxWidget);
         setValues();
 
         if (menu.getAssociatedEntity() instanceof BaseMercenary mercenary) {
             updateReputationState(mercenary);
-            if (lastReputation == 0f && currentReputation != 0) {
+            if (!reputationInitialized) {
                 lastReputation = currentReputation;
+                targetReputation = currentReputation;
+                reputationInitialized = true;
             }
         }
-
     }
 
     @Override
@@ -81,8 +85,7 @@ public class MercenaryScreen extends AbstractContainerScreen<MercenaryMenu> {
     private void setValues() {
         if (menu.getAssociatedEntity() instanceof BaseMercenary mercenary) {
             damageValue = mercenary.getAttributeValue(Attributes.ATTACK_DAMAGE);
-            rangeValue = mercenary.isRanged() ? mercenary.getAttributeValue(Attributes.FOLLOW_RANGE)
-                    : damageValue;
+            rangeValue = mercenary.isRanged() ? mercenary.getAttributeValue(Attributes.FOLLOW_RANGE) : damageValue;
         }
     }
 
@@ -92,12 +95,10 @@ public class MercenaryScreen extends AbstractContainerScreen<MercenaryMenu> {
 
         if (nameBoxWidget == null) {
             nameBoxWidget = isFocused() ? new NameBoxWidget(
-                    font, centerX + 7, centerY + 142,
-                    83, 15, Component.empty(),
+                    font, centerX + 7, centerY + 142, 83, 15, Component.empty(),
                     TEXTURE, 0, 165, 512, 256
             ) : new NameBoxWidget(
-                    font, centerX + 7, centerY + 142,
-                    83, 15, Component.empty(),
+                    font, centerX + 7, centerY + 142, 83, 15, Component.empty(),
                     TEXTURE, 7, 142, 512, 256
             );
             if (menu.getAssociatedEntity().hasCustomName()) {
@@ -164,7 +165,14 @@ public class MercenaryScreen extends AbstractContainerScreen<MercenaryMenu> {
         if (!(menu.getAssociatedEntity() instanceof BaseMercenary mercenary)) return;
 
         lastHealth = mercenary.getHealth();
+
+        int previousReputation = currentReputation;
         updateReputationState(mercenary);
+
+        if (previousReputation != currentReputation) {
+            lastReputation = targetReputation;
+            targetReputation = currentReputation;
+        }
 
         renderBackground(guiGraphics, mouseX, mouseY, partialTick);
         super.render(guiGraphics, mouseX, mouseY, partialTick);
@@ -187,7 +195,6 @@ public class MercenaryScreen extends AbstractContainerScreen<MercenaryMenu> {
                 if (remainingTicks > 0) {
                     int remainingSeconds = remainingTicks / 20;
                     displayText += " (" + formatTime(remainingSeconds) + ")";
-                    System.out.println("Adding time to display: " + formatTime(remainingSeconds));
                 }
             }
 
@@ -219,18 +226,12 @@ public class MercenaryScreen extends AbstractContainerScreen<MercenaryMenu> {
     private void renderLerpedReputationBar(GuiGraphics guiGraphics, int x, int y, float partialTick) {
         if (!(menu.getAssociatedEntity() instanceof BaseMercenary mercenary)) return;
 
-        float lerpedReputation = Mth.lerp(partialTick, lastReputation, currentReputation);
+        float lerpedReputation = Mth.lerp(partialTick, lastReputation, targetReputation);
 
         float normalizedReputation = (lerpedReputation - MercenaryReputation.MIN_REPUTATION) /
                 (MercenaryReputation.MAX_REPUTATION - MercenaryReputation.MIN_REPUTATION);
         float ratio = Mth.clamp(normalizedReputation, 0f, 1f);
         int filledHeight = Math.round(ratio * 61);
-
-        if (Math.abs(currentReputation) > 0 || Math.abs(lastReputation) > 0) {
-            System.out.println("Reputation Debug - Last: " + lastReputation + ", Current: " + currentReputation +
-                    ", Lerped: " + lerpedReputation + ", Normalized: " + normalizedReputation +
-                    ", Ratio: " + ratio + ", FilledHeight: " + filledHeight);
-        }
 
         guiGraphics.blit(TEXTURE, x + 82, y + 11 + (61 - filledHeight), 114, 170 + (61 - filledHeight), 5, filledHeight, 512, 256);
     }
@@ -249,25 +250,18 @@ public class MercenaryScreen extends AbstractContainerScreen<MercenaryMenu> {
     }
 
     private void renderStatValues(GuiGraphics guiGraphics, BaseMercenary mercenary) {
-        guiGraphics.drawString(font, String.format("%.1f", damageValue), 38, 93, 0x404040, false);
-        guiGraphics.drawString(font, String.format("%.1f", rangeValue), 38, 113, 0x404040, false);
-        guiGraphics.drawString(font, String.format("%.1f/%.1f", mercenary.getHealth(), mercenary.getMaxHealth()), 38, 133, 0x404040, false);
+        guiGraphics.drawString(font, String.format("%.1f", damageValue), 32, 84, 0x404040, false);
+        guiGraphics.drawString(font, String.format("%.1f", rangeValue), 32, 100, 0x404040, false);
+        guiGraphics.drawString(font, String.format("%.1f/%.1f", mercenary.getHealth(), mercenary.getMaxHealth()), 32, 116, 0x404040, false);
     }
 
     private void renderTimeRemaining(GuiGraphics guiGraphics, BaseMercenary mercenary) {
-
-        if (!mercenary.hasActiveContract()) {
-            return;
-        }
+        if (!mercenary.hasActiveContract()) return;
 
         int remainingTicks = mercenary.getContractRemainingTicks();
-
-        if (remainingTicks <= 0) {
-            return;
-        }
+        if (remainingTicks <= 0) return;
 
         String timeText = GuiUtility.formatTicksToTime(remainingTicks);
-
         guiGraphics.drawString(font, timeText, 195, 34, 0x404040, false);
     }
 
@@ -282,11 +276,10 @@ public class MercenaryScreen extends AbstractContainerScreen<MercenaryMenu> {
 
         int newReputation = 0;
         if (targetPlayer != null) {
-            newReputation = ReputationManager.getReputation(mercenary.level(), targetPlayer);
+            newReputation = ReputationManager.getReputation(mercenary.level(), targetPlayer, mercenary);
         }
 
         if (!targetUUID.equals(currentReputationUUID) || newReputation != currentReputation) {
-            lastReputation = currentReputation;
             currentReputationUUID = targetUUID;
             currentReputation = newReputation;
         }
@@ -308,16 +301,22 @@ public class MercenaryScreen extends AbstractContainerScreen<MercenaryMenu> {
     }
 
     private String getRandomName() {
+        if (cachedRandomName != null) {
+            return cachedRandomName;
+        }
+
         List<NamesJsonLoader.NameData> allNames = NamesJsonLoader.INSTANCE != null
                 ? NamesJsonLoader.INSTANCE.getAllNames()
                 : Collections.emptyList();
 
         if (allNames == null || allNames.isEmpty()) {
-            return "Unknown";
+            cachedRandomName = "Unknown";
+            return cachedRandomName;
         }
 
         NamesJsonLoader.NameData randomName = allNames.get(menu.getAssociatedEntity().getRandom().nextInt(allNames.size()));
-        return randomName != null && randomName.value() != null ? randomName.value() : "Unknown";
+        cachedRandomName = randomName != null && randomName.value() != null ? randomName.value() : "Unknown";
+        return cachedRandomName;
     }
 
     private String formatTime(int seconds) {
