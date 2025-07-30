@@ -39,7 +39,7 @@ public class MercenaryMenu extends AbstractContainerMenu {
         this.player = inv.player;
         checkContainerSize(container, 1);
         container.startOpen(inv.player);
-        this.addSlot(new PaymentSlot(container,0,141,34));
+        this.addSlot(new PaymentSlot(container,0,127,34));
         addPlayerInventorySlots(105,83,inv);
     }
 

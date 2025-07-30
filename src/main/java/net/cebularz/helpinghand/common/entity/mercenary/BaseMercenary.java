@@ -1,5 +1,6 @@
 package net.cebularz.helpinghand.common.entity.mercenary;
 
+import net.cebularz.helpinghand.api.loaders.NamesJsonLoader;
 import net.cebularz.helpinghand.common.entity.goals.ConditionalGoal;
 import net.cebularz.helpinghand.common.entity.mercenary.ai.MercenaryAI;
 import net.cebularz.helpinghand.common.entity.mercenary.ai.MercenaryContract;
@@ -36,6 +37,8 @@ import net.minecraft.world.level.ServerLevelAccessor;
 import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nullable;
+import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
 
 public abstract class BaseMercenary extends PathfinderMob implements NeutralMob, RangedAttackMob
@@ -53,6 +56,8 @@ public abstract class BaseMercenary extends PathfinderMob implements NeutralMob,
 
     private UUID ownerUUID;
 
+    private String cachedRandomName = null;
+
     private static final UniformInt PERSISTENT_ANGER_TIME = TimeUtil.rangeOfSeconds(20, 60);
     @Nullable
     private UUID persistentAngerTarget;
@@ -60,8 +65,26 @@ public abstract class BaseMercenary extends PathfinderMob implements NeutralMob,
         super(entityType, level);
         this.type = MercenaryType.NONE;
         this.hireSystem = new MercenaryHireSystem(this);
+        this.setCustomName(Component.literal(getRandomName()));
     }
+    private String getRandomName() {
+        if (cachedRandomName != null) {
+            return cachedRandomName;
+        }
 
+        List<NamesJsonLoader.NameData> allNames = NamesJsonLoader.INSTANCE != null
+                ? NamesJsonLoader.INSTANCE.getAllNames()
+                : Collections.emptyList();
+
+        if (allNames == null || allNames.isEmpty()) {
+            cachedRandomName = "Unknown";
+            return cachedRandomName;
+        }
+
+        NamesJsonLoader.NameData randomName = allNames.get(this.getRandom().nextInt(allNames.size()));
+        cachedRandomName = randomName != null && randomName.value() != null ? randomName.value() : "Unknown";
+        return cachedRandomName;
+    }
     @Override
     protected void registerGoals() {
         super.registerGoals();
@@ -240,6 +263,8 @@ public abstract class BaseMercenary extends PathfinderMob implements NeutralMob,
     public boolean isHired() {
         return this.entityData.get(DATA_HIRED);
     }
+
+
 
     public MercenaryContract getCurrentContract() {
         return this.currentContract;

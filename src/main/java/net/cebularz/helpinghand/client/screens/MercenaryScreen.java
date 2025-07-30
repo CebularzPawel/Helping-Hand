@@ -262,7 +262,7 @@ public class MercenaryScreen extends AbstractContainerScreen<MercenaryMenu> {
         if (remainingTicks <= 0) return;
 
         String timeText = GuiUtility.formatTicksToTime(remainingTicks);
-        guiGraphics.drawString(font, timeText, 195, 34, 0x404040, false);
+        guiGraphics.drawString(font, timeText, 186, 38, 0x404040, false);
     }
 
     private void updateReputationState(BaseMercenary mercenary) {

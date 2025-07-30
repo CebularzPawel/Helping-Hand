@@ -54,8 +54,8 @@ public class MercenaryHireSystem {
     }
 
     public void addTimeForItem() {
-        addItemForItem(Items.DIAMOND, 200);
-        addItemForItem(Items.NETHERITE_INGOT, 500);
+        addItemForItem(Items.DIAMOND, 2000);
+        addItemForItem(Items.NETHERITE_INGOT, 5000);
         addItemForItem(Items.EMERALD, 300);
         addItemForItem(Items.GOLD_INGOT, 100);
     }
